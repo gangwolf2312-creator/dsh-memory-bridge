@@ -89,9 +89,9 @@ var CSS = [
 	".dmb-field .hint { font-size: 11px; color: var(--dmb-text3); margin-top: 4px; }",
 	".dmb-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; gap: 8px; }",
 	".dmb-switch input { display: none; }",
-	".dmb-switch .track { width: 32px; height: 18px; border-radius: 999px; background: var(--dmb-border2); transition: background 0.15s ease; position: relative; flex: none; }",
-	".dmb-switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 0.15s ease; }",
-	".dmb-switch input:checked + .track { background: var(--dmb-brand); }",
+	".dmb-switch .track { width: 32px; height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--dmb-text3) 40%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dmb-text3) 20%, transparent); transition: background 0.15s ease, box-shadow 0.15s ease; position: relative; flex: none; }",
+	".dmb-switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.06); transition: transform 0.15s ease; }",
+	".dmb-switch input:checked + .track { background: var(--dmb-brand); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dmb-brand) 70%, #000); }",
 	".dmb-switch input:checked + .track::after { transform: translateX(14px); }",
 	".dmb-switch .txt { font-size: 12px; color: var(--dmb-text2); }",
 	".dmb-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--dmb-border2); background: transparent; color: var(--dmb-text2); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }",
@@ -127,6 +127,10 @@ var CSS = [
 	".dmb-log .detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
 	".dmb-spark { width: 100%; height: 84px; }",
 	".dmb-fade { animation: dmb-fadeUp 0.3s ease both; }",
+	".dmb-ic { display: inline-flex; align-items: center; gap: 5px; }",
+	".dmb-ic-line { display: inline-flex; align-items: center; gap: 4px; }",
+	".dmb-field label.dmb-switch { display: inline-flex; align-items: center; gap: 8px; position: relative; cursor: pointer; margin-bottom: 6px; }",
+	".dmb-result .chain, .dmb-tag { display: inline-flex; align-items: center; gap: 4px; }",
 ].join("\n");
 
 var CSS2 = [].join("\n");
@@ -151,6 +155,40 @@ var api = {
 
 var KIND_LABEL = { event: "事件", chain: "事件链", lesson_pending: "经验·待审", lesson_permanent: "经验", profile: "画像" };
 var KIND_COLOR = { event: "var(--dmb-accent)", chain: "var(--dmb-accent2)", lesson_pending: "var(--dmb-warn)", lesson_permanent: "var(--dmb-ok)", profile: "var(--dmb-brand)" };
+
+/* svg icons */
+var ICONS = {
+	branch: { paths: ["M6 3v12", "M18 9a9 9 0 0 1-9 9"], circles: [[18, 6, 3], [6, 18, 3]] },
+	pie: { paths: ["M21.21 15.89A10 10 0 1 1 8 2.83", "M22 12A10 10 0 0 0 12 2v10z"] },
+	server: { paths: ["M4 4h16v6H4z", "M4 14h16v6H4z", "M12 7h.01", "M12 17h.01"] },
+	compass: { circles: [[12, 12, 10]], paths: ["M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36z"] },
+	check: { paths: ["M20 6 9 17l-5-5"] },
+	bolt: { paths: ["M13 2 3 14h9l-1 8 10-12h-9l1-8z"] },
+	sliders: { paths: ["M4 21v-7", "M4 10V3", "M12 21v-9", "M12 8V3", "M20 21v-5", "M20 12V3", "M1 14h6", "M9 8h6", "M17 16h6"] },
+	save: { paths: ["M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z", "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7", "M7 3v4a1 1 0 0 0 1 1h8"] },
+	search: { circles: [[11, 11, 8]], paths: ["m21 21-4.3-4.3"] },
+	x: { paths: ["M18 6 6 18", "M6 6l12 12"] },
+	clock: { circles: [[12, 12, 10]], paths: ["M12 6v6l4 2"] },
+	file: { paths: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z", "M14 2v4a2 2 0 0 0 2 2h4", "M16 13H8", "M16 17H8"] },
+	archive: { paths: ["M21 8v13H3V8", "M1 3h22v5H1z", "M10 12h4"] },
+	trash: { paths: ["M3 6h18", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", "M10 11v6", "M14 11v6"] },
+	book: { paths: ["M4 19.5A2.5 2.5 0 0 1 6.5 17H20", "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"] },
+	ruler: { paths: ["M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z", "M14.5 12.5l2-2", "M11.5 9.5l2-2", "M8.5 6.5l2-2"] },
+	pin: { paths: ["M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"], circles: [[12, 10, 3]] },
+	trend: { paths: ["M22 7l-8.5 8.5-5-5L2 17", "M16 7h6v6"] },
+	xcircle: { circles: [[12, 12, 10]], paths: ["M15 9l-6 6", "M9 9l6 6"] },
+	link: { paths: ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"] },
+	help: { circles: [[12, 12, 10]], paths: ["M12 8.5a2.5 2.5 0 1 1 2 4c-1 .7-2 1.2-2 2.5", "M12 17h.01"] }
+};
+function Icon(props) {
+	var name = props.name || "help";
+	var size = props.size || 14;
+	var spec = ICONS[name] || ICONS.help;
+	return h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, style: { flex: "none" } },
+		(spec.circles || []).map(function (c) { return h("circle", { key: "c" + c.join("-"), cx: c[0], cy: c[1], r: c[2] }); }),
+		(spec.paths || []).map(function (d, i) { return h("path", { key: "p" + i, d: d }); })
+	);
+}
 
 /* atoms */
 function Counter(props) {
@@ -217,7 +255,7 @@ function Donut(props) {
 			data.map(function (d) {
 				var len = (d.value / total) * C;
 				var el = h("circle", { key: d.name, cx: 55, cy: 55, r: R, fill: "none", stroke: d.color, "stroke-width": 13,
-					"stroke-dasharray": len + " " + (C - len), "stroke-dashoffset": -offset, "stroke-linecap": "round",
+					"stroke-dasharray": len + " " + (C - len), "stroke-dashoffset": -offset, strokeLinecap: "round",
 					style: { transition: "stroke-dasharray 0.7s ease, stroke-dashoffset 0.7s ease", transform: "rotate(-90deg)", transformOrigin: "center" } });
 				offset += len;
 				return el;
@@ -266,7 +304,7 @@ function MemoryPanel() {
 
 	return h("div", { id: "dmb-root" },
 		h("div", { className: "dmb-header" },
-			h("div", { className: "dmb-logo" }, "🧠"),
+			h("div", { className: "dmb-logo" }, h(Icon, { name: "branch", size: 15 })),
 			h("div", null,
 				h("div", { className: "dmb-title" }, "记忆树 · Memory Bridge"),
 				h("div", { className: "dmb-subtitle" }, overview ? (overview.memoryRoot || "") : "加载中…")
@@ -321,7 +359,7 @@ function OverviewTab(props) {
 			h(Stat, { accent: "var(--dmb-text3)", label: "对话 Run", value: runs.total || 0, sub: (runs.staged || 0) + " 待提取", delay: 300 })
 		),
 		h("div", { className: "dmb-card", style: { animationDelay: "120ms" } },
-			h("h3", null, h("span", { className: "ico" }, "📊"), "记忆构成"),
+			h("h3", null, h(Icon, { name: "pie", size: 14 }), "记忆构成"),
 			h("div", { className: "dmb-chart-row" },
 				h(Donut, { data: donutData }),
 				h("div", { className: "dmb-bars" },
@@ -334,15 +372,15 @@ function OverviewTab(props) {
 		),
 		h("div", { className: "dmb-grid", style: { gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" } },
 			h("div", { className: "dmb-card", style: { marginBottom: 0 } },
-				h("h3", null, h("span", { className: "ico" }, "🦙"), "本地推理 Lemonade"),
+				h("h3", null, h(Icon, { name: "server", size: 14 }), "本地推理 Lemonade"),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "服务状态")), h("div", null, h("span", { className: "dmb-pill" }, h(Dot, { state: lemonade.serverUp ? "ok" : "err" }), lemonade.serverUp ? "运行中" : "离线"))),
-				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "目标模型加载")), h("div", { className: "v" }, lemonade.modelLoaded ? "✓ 已就绪" : "未加载")),
+				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "目标模型加载")), h("div", { className: "v" }, lemonade.modelLoaded ? h("span", { className: "dmb-ic" }, h(Icon, { name: "check", size: 12 }), "已就绪") : "未加载")),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "已加载模型")), h("div", { className: "v" }, (lemonade.loadedModels || []).join(", ") || "—")),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "版本")), h("div", { className: "v" }, lemonade.version || "—")),
 				h("div", { className: "dmb-actions" }, h(LemonadeEnsure, { onDone: props.refresh }))
 			),
 			h("div", { className: "dmb-card", style: { marginBottom: 0 } },
-				h("h3", null, h("span", { className: "ico" }, "🧭"), "提取与注入"),
+				h("h3", null, h(Icon, { name: "compass", size: 14 }), "提取与注入"),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "提取模式")), h("div", { className: "v" }, extractMode)),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "注入命中")), h("div", { className: "v" }, String(audit.inject_hits || 0))),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "注入利用率")), h("div", { className: "v" }, usedRate)),
@@ -367,12 +405,12 @@ function LemonadeEnsure(props) {
 	var run = function () {
 		setBusy(true);
 		api.post("lemonade-ensure", {}).then(function (res) {
-			toast.show(res.status && res.status.modelLoaded ? "模型就绪 ✓" : "服务已就绪", "ok");
+			toast.show(res.status && res.status.modelLoaded ? "模型就绪" : "服务已就绪", "ok");
 			props.onDone && props.onDone();
 		}).catch(function (err) { toast.show("拉起失败：" + ((err && err.message) || err), "err"); }).finally(function () { setBusy(false); });
 	};
 	return h("span", null,
-		h("button", { className: "dmb-btn primary", onClick: run, disabled: busy }, busy ? "拉起中…" : "⚡ 拉起模型"),
+		h("button", { className: "dmb-btn primary", onClick: run, disabled: busy }, busy ? "拉起中…" : h("span", { className: "dmb-ic" }, h(Icon, { name: "bolt", size: 13 }), "拉起模型")),
 		toast.node
 	);
 }
@@ -418,7 +456,7 @@ function ConfigForm(props) {
 	];
 
 	return h("div", { className: "dmb-card" },
-		h("h3", null, h("span", { className: "ico" }, "⚙️"), "提取配置（面板内保存，重启后完全生效）"),
+		h("h3", null, h(Icon, { name: "sliders", size: 14 }), "提取配置（面板内保存，重启后完全生效）"),
 		h("div", { className: "dmb-section-title", style: { marginTop: 4 } }, "模式"),
 		h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
 			modes.map(function (m) {
@@ -431,7 +469,8 @@ function ConfigForm(props) {
 				h("div", { className: "dmb-field" }, h("label", null, "预设"), h("select", { value: local.preset, onChange: function (e) { set("local.preset", e.target.value); } }, h("option", { value: "qwen3-it-4b-flm" }, "qwen3-it-4b-flm（推荐）"), h("option", { value: "custom" }, "自定义"))),
 				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "Base URL"), h("input", { value: local.baseUrl, placeholder: "http://127.0.0.1:xxxx/v1", onChange: function (e) { set("local.baseUrl", e.target.value); } })) : null,
 				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: local.model, placeholder: "model-name", onChange: function (e) { set("local.model", e.target.value); } })) : null,
-				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.autoManage, onChange: function (e) { set("local.autoManage", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "自动健康检查 + 拉起 Lemonade")))
+				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.autoManage, onChange: function (e) { set("local.autoManage", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "自动健康检查 + 拉起 Lemonade"))),
+				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.sanitize, onChange: function (e) { set("local.sanitize", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "发送前脱敏")))
 			),
 			h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } }))
 		) : null,
@@ -446,7 +485,7 @@ function ConfigForm(props) {
 			h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!cloud.sanitize, onChange: function (e) { set("cloud.sanitize", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "发送前脱敏（密钥/凭证 → 占位符）")))
 		) : null,
 		h("div", { className: "dmb-actions" },
-			h("button", { className: "dmb-btn primary", onClick: save, disabled: saving }, saving ? "保存中…" : "💾 保存配置"),
+			h("button", { className: "dmb-btn primary", onClick: save, disabled: saving }, saving ? "保存中…" : h("span", { className: "dmb-ic" }, h(Icon, { name: "save", size: 13 }), "保存配置")),
 			h("span", { style: { color: "var(--dmb-text3)", fontSize: "11px", alignSelf: "center" } }, "重启后对提取管线完全生效")
 		),
 		toast.node
@@ -482,7 +521,7 @@ function CardsTab(props) {
 
 	var act = function (id, action) {
 		api.post("card-action", { id: id, action: action }).then(function () {
-			toast.show(action + " ✓", "ok");
+			toast.show(action, "ok");
 			setDetail(null);
 			setVersion(function (v) { return v + 1; });
 			props.onPendingChange && props.onPendingChange();
@@ -493,9 +532,9 @@ function CardsTab(props) {
 
 	return h("div", null,
 		h("div", { className: "dmb-search" },
-			h("span", { className: "mag" }, "🔍"),
+			h("span", { className: "mag" }, h(Icon, { name: "search", size: 14 })),
 			h("input", { placeholder: "搜索记忆：如「上次搬家注意什么」「服务器端口」", value: query, onChange: function (e) { setQuery(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") load(query, kind); } }),
-			query ? h("button", { className: "clear", onClick: function () { setQuery(""); load("", kind); } }, "✕") : null
+			query ? h("button", { className: "clear", onClick: function () { setQuery(""); load("", kind); } }, h(Icon, { name: "x", size: 12 })) : null
 		),
 		h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 } },
 			filters.map(function (f) {
@@ -505,10 +544,10 @@ function CardsTab(props) {
 		loading ? h(Spinner, null) : !data || data.items.length === 0 ? h(Empty, null, "没有匹配的记忆卡") :
 			data.items.map(function (item, i) {
 				return h("div", { key: item.id, className: "dmb-result", style: { animationDelay: Math.min(i * 40, 300) + "ms" }, onClick: function () { open(item.id); } },
-					h("div", { className: "top" }, h("span", { className: "t" }, item.title || item.id), h(KindBadge, { kind: item.kind }), item.chainTitle ? h("span", { className: "chain" }, "⛓ " + item.chainTitle) : null),
+					h("div", { className: "top" }, h("span", { className: "t" }, item.title || item.id), h(KindBadge, { kind: item.kind }), item.chainTitle ? h("span", { className: "chain" }, h(Icon, { name: "link", size: 11 }), item.chainTitle) : null),
 					typeof item.score === "number" ? h("div", { className: "scorebar" }, h("i", { style: { width: Math.max(4, Math.min(100, item.score * 100)) + "%" } })) : null,
 					item.snippet ? h("div", { className: "snip" }, item.snippet) : null,
-					h("div", { className: "meta" }, item.createdAt ? h("span", null, "🕒 " + item.createdAt) : null, item.sourcePath ? h("span", null, "📄 " + item.sourcePath) : null)
+					h("div", { className: "meta" }, item.createdAt ? h("span", { className: "dmb-ic-line" }, h(Icon, { name: "clock", size: 11 }), item.createdAt) : null, item.sourcePath ? h("span", { className: "dmb-ic-line" }, h(Icon, { name: "file", size: 11 }), item.sourcePath) : null)
 				);
 			}),
 		detail ? h(CardDetail, { card: detail, onClose: function () { setDetail(null); }, onAction: act }) : null,
@@ -533,11 +572,11 @@ function CardDetail(props) {
 			h("div", { style: { color: "var(--dmb-text2)", fontSize: 12, whiteSpace: "pre-wrap" } }, card.content || ""),
 			card.source_path ? h("div", { className: "raw" }, card.source_path) : null,
 			h("div", { className: "dmb-actions" },
-				pending ? h("button", { className: "dmb-btn primary", onClick: function () { props.onAction(card.id, "approve"); } }, "✓ 采纳") : null,
-				pending ? h("button", { className: "dmb-btn danger", onClick: function () { props.onAction(card.id, "archive"); } }, "🗄 归档") : null,
+				pending ? h("button", { className: "dmb-btn primary", onClick: function () { props.onAction(card.id, "approve"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "check", size: 13 }), "采纳")) : null,
+				pending ? h("button", { className: "dmb-btn danger", onClick: function () { props.onAction(card.id, "archive"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "archive", size: 13 }), "归档")) : null,
 				card.status === "archived" ? h("button", { className: "dmb-btn", onClick: function () { props.onAction(card.id, "restore"); } }, "↩ 恢复") : null,
-				h("button", { className: "dmb-btn", onClick: function () { props.onAction(card.id, "archive"); } }, "🗄 归档"),
-				h("button", { className: "dmb-btn danger", onClick: function () { props.onAction(card.id, "delete"); } }, "🗑 删除"),
+				h("button", { className: "dmb-btn", onClick: function () { props.onAction(card.id, "archive"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "archive", size: 13 }), "归档")),
+				h("button", { className: "dmb-btn danger", onClick: function () { props.onAction(card.id, "delete"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "trash", size: 13 }), "删除")),
 				h("button", { className: "dmb-btn", onClick: props.onClose }, "关闭")
 			)
 		)
@@ -559,17 +598,17 @@ function WikiTab() {
 
 	return h("div", null,
 		h("div", { className: "dmb-search" },
-			h("span", { className: "mag" }, "📚"),
+			h("span", { className: "mag" }, h(Icon, { name: "book", size: 14 })),
 			h("input", { placeholder: "搜索知识库：规范、概念、教程", value: query, onChange: function (e) { setQuery(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") search(); } }),
-			query ? h("button", { className: "clear", onClick: function () { setQuery(""); setData(null); } }, "✕") : null
+			query ? h("button", { className: "clear", onClick: function () { setQuery(""); setData(null); } }, h(Icon, { name: "x", size: 12 })) : null
 		),
 		loading ? h(Spinner, null) : !data ? h(Empty, null, "输入关键词检索知识库") :
 			data.length === 0 ? h(Empty, null, "无命中") :
 			data.map(function (r, i) {
 				return h("div", { key: r.entryId + r.sectionPath, className: "dmb-result", style: { animationDelay: Math.min(i * 40, 300) + "ms" } },
-					h("div", { className: "top" }, h("span", { className: "t" }, r.title), r.specId ? h("span", { className: "chain" }, "📐 " + r.specId) : null),
+					h("div", { className: "top" }, h("span", { className: "t" }, r.title), r.specId ? h("span", { className: "chain" }, h(Icon, { name: "ruler", size: 11 }), r.specId) : null),
 					h("div", { className: "snip" }, r.snippet || ""),
-					h("div", { className: "meta" }, r.sectionPath ? h("span", null, "📍 " + r.sectionPath) : null, h("span", null, "score " + ((r.score || 0)).toFixed(2)))
+					h("div", { className: "meta" }, r.sectionPath ? h("span", { className: "dmb-ic-line" }, h(Icon, { name: "pin", size: 11 }), r.sectionPath) : null, h("span", null, "score " + ((r.score || 0)).toFixed(2)))
 				);
 			}),
 		toast.node
@@ -600,7 +639,7 @@ function ReviewTab(props) {
 
 	var act = function (id, action) {
 		api.post("card-action", { id: id, action: action }).then(function () {
-			toast.show(action + " ✓", "ok");
+			toast.show(action, "ok");
 			setVersion(function (v) { return v + 1; });
 		}).catch(function (e) { toast.show(String((e && e.message) || e), "err"); });
 	};
@@ -613,8 +652,8 @@ function ReviewTab(props) {
 					h("div", { className: "top" }, h("span", { className: "t" }, c.title || c.id), h(KindBadge, { kind: "lesson_pending" }), h("span", { className: "dmb-tag" }, "置信 ", h("b", null, ((c.confidence || 0) * 100).toFixed(0) + "%"))),
 					h("div", { className: "snip" }, c.content || ""),
 					h("div", { className: "dmb-actions" },
-						h("button", { className: "dmb-btn primary", onClick: function () { act(c.id, "approve"); } }, "✓ 采纳"),
-						h("button", { className: "dmb-btn danger", onClick: function () { act(c.id, "archive"); } }, "🗄 拒绝")
+						h("button", { className: "dmb-btn primary", onClick: function () { act(c.id, "approve"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "check", size: 13 }), "采纳")),
+						h("button", { className: "dmb-btn danger", onClick: function () { act(c.id, "archive"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "xcircle", size: 13 }), "拒绝"))
 					)
 				);
 			}),
@@ -658,7 +697,7 @@ function AuditTab() {
 			h(Stat, { accent: "var(--dmb-text3)", label: "提取跳过", value: s.extract_skips || 0, delay: 300 })
 		),
 		h("div", { className: "dmb-card" },
-			h("h3", null, h("span", { className: "ico" }, "📈"), "最近活动轨迹（按事件）"),
+			h("h3", null, h(Icon, { name: "trend", size: 14 }), "最近活动轨迹（按事件）"),
 			h(Sparks, { data: sparkData }),
 			h("div", { style: { color: "var(--dmb-text3)", fontSize: 11, marginTop: 6 } }, "绿=注入被用 · 黄=注入未用 · 蓝=注入命中 · 紫=提取 · 灰=跳过")
 		),
