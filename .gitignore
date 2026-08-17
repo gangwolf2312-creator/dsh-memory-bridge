@@ -1,0 +1,8 @@
+# runtime artifacts
+config.json
+*.log
+_err.txt
+_out.txt
+__pycache__/
+*.pyc
+node_modules/
