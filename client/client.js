@@ -701,12 +701,13 @@ function apply(ctx) {
 	ctx.effect(function () {
 		ctx.locale.register("dsh-memory", { zh: zh, en: en });
 	}, "dsh-memory: dictionaries");
+	var t = ctx.locale.bind("dsh-memory");
 	ctx.slots.inject("settings.section", function () {
 		return ctx.slots.register({
 			name: "settings.section",
 			id: "memory",
 			order: 30,
-			label: function () { return ctx.locale.t("dsh-memory", "nav"); },
+			label: function () { return t("nav"); },
 			locale: "dsh-memory"
 		}, function () {
 			return h(MemoryPanel, null);
