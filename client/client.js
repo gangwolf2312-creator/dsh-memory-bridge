@@ -19,7 +19,7 @@ var CSS = [
 	"@keyframes dmb-grow { from { width: 0; } }",
 	"@keyframes dmb-pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }",
 	".dmb-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid var(--dmb-border); flex-wrap: wrap; }",
-	".dmb-logo { width: 26px; height: 26px; border-radius: 7px; background: var(--dmb-brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none; }",
+	".dmb-logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(150deg, #1a2233 0%, #10151f 100%); box-shadow: inset 0 0 0 1px rgba(122,146,255,0.18), 0 1px 3px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; flex: none; }",
 	".dmb-title { font-size: 14px; font-weight: 600; letter-spacing: 0.1px; }",
 	".dmb-subtitle { font-size: 12px; color: var(--dmb-text3); margin-top: 1px; }",
 	".dmb-pills { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }",
@@ -190,6 +190,53 @@ function Icon(props) {
 	);
 }
 
+/* 九宫格贪吃蛇 logo */
+var SNAKE_DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+function SnakeLogo(props) {
+	var size = props.size || 26;
+	var _sl0 = useState([[1, 1]]), trail = _sl0[0], setTrail = _sl0[1];
+	useEffect(function () {
+		var timer = setInterval(function () {
+			setTrail(function (prev) {
+				var head = prev[0] || [1, 1];
+				var nexts = [];
+				for (var i = 0; i < SNAKE_DIRS.length; i++) {
+					var nx = head[0] + SNAKE_DIRS[i][0];
+					var ny = head[1] + SNAKE_DIRS[i][1];
+					if (nx >= 0 && nx < 3 && ny >= 0 && ny < 3) nexts.push([nx, ny]);
+				}
+				var back = prev[1];
+				var pool = nexts.filter(function (c) { return !back || c[0] !== back[0] || c[1] !== back[1]; });
+				if (!pool.length) pool = nexts;
+				var n = pool[Math.floor(Math.random() * pool.length)];
+				return [n, head].concat(prev.slice(1, 3));
+			});
+		}, 320);
+		return function () { clearInterval(timer); };
+	}, []);
+	var dots = [];
+	for (var r = 0; r < 3; r++) {
+		for (var c = 0; c < 3; c++) {
+			dots.push(h("circle", { key: "g" + r + "_" + c, cx: 5 + c * 5, cy: 5 + r * 5, r: 1.3, fill: "rgba(122,146,255,0.34)" }));
+		}
+	}
+	var segs = trail.map(function (p, i) {
+		var head = i === 0;
+		return h("circle", {
+			key: "s" + i,
+			cx: 5 + p[1] * 5,
+			cy: 5 + p[0] * 5,
+			r: head ? 2.2 : 1.7,
+			fill: "#4d8dff",
+			style: {
+				opacity: head ? 1 : (i === 1 ? 0.6 : 0.35),
+				filter: head ? "drop-shadow(0 0 3.5px rgba(77,141,255,0.95)) drop-shadow(0 0 9px rgba(77,141,255,0.45))" : "none",
+				transition: "cx 0.3s ease, cy 0.3s ease"
+			}
+		});
+	});
+	return h("svg", { width: size, height: size, viewBox: "0 0 20 20", "aria-hidden": true, style: { display: "block" } }, dots.concat(segs));
+}
 /* atoms */
 function Counter(props) {
 	var value = props.value, suffix = props.suffix || "", prefix = props.prefix || "";
@@ -304,7 +351,7 @@ function MemoryPanel() {
 
 	return h("div", { id: "dmb-root" },
 		h("div", { className: "dmb-header" },
-			h("div", { className: "dmb-logo" }, h(Icon, { name: "branch", size: 15 })),
+			h("div", { className: "dmb-logo" }, h(SnakeLogo, { size: 26 })),
 			h("div", null,
 				h("div", { className: "dmb-title" }, "记忆树 · Memory Bridge"),
 				h("div", { className: "dmb-subtitle" }, overview ? (overview.memoryRoot || "") : "加载中…")
