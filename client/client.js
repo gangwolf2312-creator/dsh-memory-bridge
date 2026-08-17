@@ -434,7 +434,7 @@ function ConfigForm(props) {
 				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: local.model, placeholder: "model-name", onChange: function (e) { set("local.model", e.target.value); } })) : null,
 				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.autoManage, onChange: function (e) { set("local.autoManage", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "自动健康检查 + 拉起 Lemonade")))
 			),
-			local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } })) : null
+			h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } }))
 		) : null,
 		form.mode === "cloud" || form.mode === "hybrid" ? h("div", null,
 			h("div", { className: "dmb-section-title" }, "云端轨"),
