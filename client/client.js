@@ -399,6 +399,7 @@ function MemoryPanel() {
 	var _s5 = useState(true), loading = _s5[0], setLoading = _s5[1];
 	var _s6 = useState(0), refreshKey = _s6[0], setRefreshKey = _s6[1];
 	var _s7 = useState(0), pendingCount = _s7[0], setPendingCount = _s7[1];
+	var _s8 = useState(0), profileDrafts = _s8[0], setProfileDrafts = _s8[1];
 
 	var refresh = useCallback(function () { setRefreshKey(function (k) { return k + 1; }); }, []);
 
@@ -413,6 +414,13 @@ function MemoryPanel() {
 		}).finally(function () { setLoading(false); });
 	}, [refreshKey]);
 
+	// 画像草稿数（badge）
+	useEffect(function () {
+		api.get("profile-status").then(function (data) {
+			setProfileDrafts((data && data.drafts && data.drafts.length) || 0);
+		}).catch(function () { /* badge optional */ });
+	}, [refreshKey]);
+
 	var lemonade = overview && overview.lemonade;
 	var counts = (overview && overview.counts) || {};
 	var mode = (overview && overview.config && overview.config.mode) || "main";
@@ -423,6 +431,7 @@ function MemoryPanel() {
 		{ id: "wikigraph", label: "知识图谱" },
 		{ id: "timeline", label: "时间线" },
 		{ id: "review", label: "待审", badge: pendingCount || undefined },
+		{ id: "profile", label: "画像", badge: profileDrafts || undefined },
 		{ id: "audit", label: "审计" }
 	];
 
@@ -450,6 +459,7 @@ function MemoryPanel() {
 			tab === "wikigraph" ? h(WikiGraphTab, { refreshKey: refreshKey }) : null,
 			tab === "timeline" ? h(TimelineTab, { refreshKey: refreshKey }) : null,
 			tab === "review" ? h(ReviewTab, { onPendingChange: setPendingCount }) : null,
+			tab === "profile" ? h(ProfileTab, { onDraftChange: setProfileDrafts }) : null,
 			tab === "audit" ? h(AuditTab, null) : null
 		)
 	);
@@ -728,6 +738,79 @@ function AuditTab() {
 					h("span", { className: "ts" }, entry.ts || ""),
 					h("span", { className: "topic" }, entry.topic),
 					h("span", { className: "detail" }, entry.detail || "")
+				);
+			}),
+		toast.node
+	);
+}
+
+/* profile tab: 画像蒸馏 / 审批 / 状态 */
+function ProfileTab(props) {
+	var _p0 = useState(null), data = _p0[0], setData = _p0[1];
+	var _p1 = useState(true), loading = _p1[0], setLoading = _p1[1];
+	var _p2 = useState(false), distillBusy = _p2[0], setDistillBusy = _p2[1];
+	var _p3 = useState(false), actingDraft = _p3[0], setActingDraft = _p3[1];
+	var toast = useToast();
+
+	var load = useCallback(function () {
+		setLoading(true);
+		api.get("profile-status", {}).then(function (r) {
+			setData(r);
+			props.onDraftChange && props.onDraftChange(((r && r.drafts) || []).length);
+		}).catch(function (e) { toast.show(String((e && e.message) || e), "err"); }).finally(function () { setLoading(false); });
+	}, []);
+	useEffect(function () { load(); }, [load]);
+
+	var runDistill = function () {
+		if (distillBusy) return;
+		setDistillBusy(true);
+		api.post("distill", {}).then(function (r) {
+			if (r && r.draft) toast.show("画像草稿已产出，待审批", "ok");
+			else toast.show((r && r.note) || "蒸馏完成（无新草稿）", "ok");
+			load();
+		}).catch(function (e) { toast.show("蒸馏失败：" + ((e && e.message) || e), "err"); }).finally(function () { setDistillBusy(false); });
+	};
+
+	var act = function (draftId, action) {
+		if (actingDraft) return;
+		setActingDraft(draftId);
+		api.post(action === "approve" ? "distill-approve" : "distill-reject", { draftId: draftId }).then(function () {
+			toast.show(action === "approve" ? "画像已固化" : "草稿已驳回", "ok");
+			load();
+		}).catch(function (e) { toast.show("操作失败：" + ((e && e.message) || e), "err"); }).finally(function () { setActingDraft(null); });
+	};
+
+	if (loading && !data) return h(Spinner, null);
+	if (!data) return null;
+
+	var approved = data.approved;
+	var drafts = data.drafts || [];
+
+	return h("div", null,
+		h("div", { className: "dmb-card" },
+			h("h3", null, h(Icon, { name: "pin", size: 14 }), "用户画像"),
+			approved ? h("div", null,
+				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "状态")), h("div", { className: "v" }, h("span", { className: "dmb-pill" }, h(Dot, { state: "ok" }), "已固化 v" + approved.version))),
+				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "更新时间")), h("div", { className: "v" }, (approved.updatedAt || "").slice(0, 19) || "—")),
+				approved.mbti ? h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "MBTI")), h("div", { className: "v" }, approved.mbti)) : null,
+				h("div", { style: { marginTop: 8, whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--dmb-text1)" } }, approved.summary || "—")
+			) : h(Empty, null, "暂无已审批画像——点击下方「蒸馏画像」从事件树生成"),
+			h("div", { className: "dmb-actions" },
+				h("button", { className: "dmb-btn primary", onClick: runDistill, disabled: distillBusy }, distillBusy ? "蒸馏中…" : h("span", { className: "dmb-ic" }, h(Icon, { name: "bolt", size: 13 }), "蒸馏画像"))
+			)
+		),
+		h("div", { className: "dmb-section-title" }, "待审草稿（" + drafts.length + "）"),
+		drafts.length === 0 ? h(Empty, null, "没有待审画像草稿") :
+			drafts.map(function (d, i) {
+				return h("div", { key: d.draftId, className: "dmb-result", style: { animationDelay: (i * 50) + "ms" } },
+					h("div", { className: "top" },
+						h("span", { className: "t" }, d.mbti ? "MBTI " + d.mbti : "画像草稿"),
+						h("span", { className: "dmb-tag" }, (d.updatedAt || "").slice(0, 16) || ""),
+						h("div", { className: "grow" }),
+						h("button", { className: "dmb-btn primary", disabled: !!actingDraft, onClick: function () { act(d.draftId, "approve"); } }, "采纳"),
+						h("button", { className: "dmb-btn", disabled: !!actingDraft, onClick: function () { act(d.draftId, "reject"); } }, "驳回")
+					),
+					h("div", { className: "snip" }, d.summary || "—")
 				);
 			}),
 		toast.node

@@ -620,10 +620,22 @@ def rpc_distill(params: dict[str, Any] | None = None) -> dict[str, Any]:
     return {"ok": True, "draft": {"summary": draft.summary[:120], "status": draft.status}}
 
 
+def _safe_draft_id(draft_id: str) -> str:
+    """画像草稿 id 白名单：只允许纯文件名（防路径穿越）。"""
+    draft_id = str(draft_id or "").strip()
+    name = Path(draft_id).name
+    if name != draft_id or name.startswith(".") or "/" in draft_id or "\\" in draft_id:
+        raise ValueError("invalid draft id")
+    return name
+
+
 def rpc_distill_approve(params: dict[str, Any]) -> dict[str, Any]:
     """审批画像草稿 → PROFILE.md（status=approved，version+1）。"""
     eng = ensure_engine()
-    draft_id = str(params.get("draftId", ""))
+    try:
+        draft_id = _safe_draft_id(str(params.get("draftId", "")))
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
     try:
         approved = eng["profile_store"].approve(draft_id)
     except KeyError as exc:
@@ -635,7 +647,10 @@ def rpc_distill_approve(params: dict[str, Any]) -> dict[str, Any]:
 def rpc_distill_reject(params: dict[str, Any]) -> dict[str, Any]:
     """驳回画像草稿 → profiles/rejected/（明文保留）。"""
     eng = ensure_engine()
-    draft_id = str(params.get("draftId", ""))
+    try:
+        draft_id = _safe_draft_id(str(params.get("draftId", "")))
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
     try:
         eng["profile_store"].reject(draft_id)
     except KeyError as exc:
@@ -933,10 +948,13 @@ def rpc_inject(params: dict[str, Any]) -> dict[str, Any]:
     # 常驻基线快照（低频推式层）：approved 画像 + 高置信永久经验，digest 变更检测
     snapshot_text = ""
     snapshot_digest = ""
-    with contextlib.suppress(Exception):
+    try:
         profile = eng["profile_store"].load()
         approved = profile if (profile is not None and profile.status == "approved") else None
         snapshot_text, snapshot_digest = inj.build_static_snapshot(profile=approved)
+    except Exception as exc:  # noqa: BLE001 - 快照失败不拖垮注入，但必须留痕可查
+        with contextlib.suppress(Exception):
+            eng["store"].log_decision("inject_snapshot_error", f"{type(exc).__name__}: {exc}")
     text = "\n".join(inj.format_result(r) for r in results)
     if snapshot_text:
         text = (snapshot_text + "\n" + text).strip()
