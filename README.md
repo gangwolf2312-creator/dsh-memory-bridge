@@ -1,273 +1,281 @@
 # dsh-memory-bridge
 
-为 DeepSeek Harness 提供**长期记忆**的桥接插件：对话自动沉淀为可检索、可审计、可治理的记忆树，并在后续对话中按需注入上下文。它最初是一个**可进化的私人记忆系统**——面向个人使用而设计，现在开源出来给有兴趣的人自取。
+A **long-term memory** bridge plugin for DeepSeek Harness: conversations are distilled into a searchable, auditable, governable memory tree, and relevant context is injected on demand in later conversations. It began as a personal **evolvable private memory system** and is now open-sourced for anyone interested.
 
-- 存储：明文 Markdown 真源 + SQLite 索引（可读、可修、可迁移）
-- 检索：BM25 + 多路 RRF 相关度排序召回（零 LLM、零外部服务）
-- 治理：遗忘曲线、审计闭环、全局收缩——记忆会老化但可解释
-- UI：设置页内 7 个可视化 tab（总览 / 事件图谱 / 知识图谱 / 时间线 / 待审 / 画像 / 审计）
+- **Storage**: plain-Markdown source of truth + SQLite index (readable, editable, portable)
+- **Retrieval**: BM25 + multi-way RRF relevance-ranked recall (zero-LLM, zero external service)
+- **Governance**: decay curve, audit loop, global contraction — memory ages but stays explainable
+- **UI**: 7 visual tabs in Settings (Overview / Event Graph / Knowledge Graph / Timeline / Review / Profile / Audit)
 
 ---
 
-## 项目定位
+## Positioning
 
-**核心适用场景：上下文窗口受限的记忆系统。**
+**Core use case: memory under a constrained context window.**
 
-DeepSeek 云端模型（V4）提供 **100 万 token 的上下文窗口**（[公开资料](https://www.orcarouter.ai/blog/deepseek-v4-review)），在这个前提下，DSH 自带的机制（resume 恢复整个会话 + compaction 压缩超长上下文）足以维持记忆——"把历史都塞进窗口"是可行的。
+DeepSeek cloud models (V4) offer a **1M-token context window** ([public source](https://www.orcarouter.ai/blog/deepseek-v4-review)). Within that, DSH's built-in mechanisms (resume the full session + compaction for over-long context) can carry memory — "stuff all history into the window" is viable.
 
-但**一旦接入本地模型**（Ollama 等），情况完全不同：上下文窗口通常是 **4K-32K，且需显式配置、性能随长度显著下降**（[Ollama 文档](https://docs.ollama.com/context-length)）——窗口缩小几十倍，"把历史都塞进去"不再可行。**这时候记忆必须结构化、可检索、按需注入**，而不是依赖长上下文硬扛。
+But with **local models** (Ollama et al.) the situation is different: context windows are typically **4K-32K and require explicit configuration, with performance degrading noticeably as length grows** ([Ollama docs](https://docs.ollama.com/context-length)) — the window shrinks by tens of times, so "stuff everything in" is no longer feasible. **Memory must be structured, searchable, and injected on demand** instead of riding on a long window.
 
-**本插件解决的正是这个实用场景**：
+**This plugin targets exactly that practical scenario:**
 
-> 当上下文窗口受限（本地模型 / 小窗口模型）时，如何仍然拥有可用的长期记忆？
+> How do you still have usable long-term memory when the context window is constrained (local / small-window models)?
 
-方案：把对话中值得留存的（你是谁、做过什么、哪些决定被认可、哪些经验被验证）**提取、结构化、存储**，在每轮对话中**只注入相关的几条**（而非全部历史）。即使窗口很小，记忆依然可用。
+Approach: extract, structure, and store what's worth keeping (who you are, what you did, which decisions were accepted, which lessons were validated), then **inject only the relevant few items** each turn (not the whole history). Memory stays usable even with a small window.
 
-**用户群体**：
+**Audience**:
 
-| 群体 | 使用方式 |
+| Audience | How they use it |
 |---|---|
-| **本地模型用户** | 上下文窗口小（4K-32K），最需要"按需注入"而非"全量塞入"——核心场景 |
-| **DeepSeek 云端用户** | 1M 窗口下是"锦上添花"：获得结构化检索、治理、可视化，而非靠窗口硬扛 |
-| **记忆敏感用户** | 明文存储 + 完整溯源 + 人工审批通道，数据透明可控 |
-| **开发者 / 自托管者** | 引擎与桥接分离、零外部服务依赖、可二次开发 |
+| **Local-model users** | Small windows (4K-32K) need "inject on demand" rather than "stuff everything in" — the core scenario |
+| **DeepSeek cloud users** | With a 1M window it's a nice-to-have: structured retrieval, governance, visualization instead of brute-forcing the window |
+| **Memory-conscious users** | Plain-text storage, full provenance, human-approval channel — transparent and controllable |
+| **Developers / self-hosters** | Engine and bridge are separated, zero external dependencies, extensible |
 
-**边界声明**：这是一个**记忆基础设施**，不是"记忆完美的智能体"——提取质量依赖所选 LLM，检索是**相关度排序召回**（非语义联想，也有多跳扩展），这些取舍在"已知局限"中如实说明。
+**Boundary statement**: this is a **memory infrastructure**, not a "perfect-memory agent" — extraction quality depends on the chosen LLM; retrieval is **relevance-ranked recall** (not semantic association, though it does multi-hop expansion). These trade-offs are stated honestly in "Known limitations".
 
 ---
 
-## 在 Harness 中：提供什么 · 解决什么 · 价值
+## What it provides / solves / values (in Harness)
 
-### 提供什么（能力清单，站在使用者视角）
+### Provides (capability list, from a user's perspective)
 
-| 能力 | 怎么用 |
+| Capability | How |
 |---|---|
-| **跨会话持久记忆** | 对话自动沉淀为记忆卡，后续会话按需检索注入——补足 DSH 会话上下文之外的持久事实层 |
-| **记忆检索工具** | agent 可用 `memory_search` / `memory_add_run` / `memory_review` 三个工具主动读写记忆 |
-| **记忆可视化** | 设置页 7 个 tab：事件图谱、知识图谱、时间线、待审、画像、审计、总览 |
-| **经验与画像** | "记住教训/踩坑"立即沉淀永久经验；偏好信号聚合提案；画像蒸馏 + 人工审批 |
-| **治理闭环** | 遗忘曲线、利用率收缩、审计反馈——记忆库不无限膨胀 |
+| **Cross-session persistent memory** | Conversations are distilled into memory cards; later sessions retrieve and inject on demand — a persistent fact layer beyond DSH's session context |
+| **Memory tools for the agent** | `memory_search` / `memory_add_run` / `memory_review` let the agent read/write memory proactively |
+| **Memory visualization** | 7 tabs: Event Graph, Knowledge Graph, Timeline, Review, Profile, Audit, Overview |
+| **Lessons & profile** | "记住教训/踩坑" records permanent lessons instantly; preference signals aggregate into proposals; profile distillation with human approval |
+| **Governance loop** | Decay curve, utilization contraction, audit feedback — the memory store doesn't grow without bound |
 
-### 解决什么（痛点）
+### Solves (pain points)
 
-| 痛点 | 本插件的解法 |
+| Pain point | How this plugin addresses it |
 |---|---|
-| **上下文窗口受限**：本地模型窗口 4K-32K，塞不下全部历史；DeepSeek 云端靠 1M 窗口硬扛但成本高 | 只注入相关的几条记忆（分档限量），窗口小也够用；云端则省 token |
-| **新会话不携带旧事实**：resume/fork 只能"续上旧对话"，新开会话仍不知道你是谁、做过什么、既定决定 | 自动提取沉淀到持久层，新会话按需注入恢复背景 |
-| **历史不可检索/治理**：会话日志是流水文本，不可查"我之前说过什么偏好" | 结构化记忆卡 + 相关度排序检索 + 分档注入 + 治理闭环 |
-| **记忆不可信**：模型"记得"可能是幻觉 | 检索零 LLM 相关度召回；写入带证据标签 + 溯源；低置信走人工审批 |
-| **数据黑盒**：记忆锁在数据库/向量库里，不可读不可改 | 明文 Markdown 真源，可读可修可迁移 |
-| **记忆库膨胀**：越积越多，噪音淹没信号 | 遗忘曲线（30 天闲置完结）+ 利用率治理 + 降权淡出 |
-| **投入产出不明**：装了记忆插件不知道有没有用 | 审计 tab：注入命中率 / 利用率 / 提取成本，闭环可量化 |
+| **Constrained context window**: local models 4K-32K can't fit history; cloud relies on a 1M window at cost | Injects only the relevant few memories (tiered, capped) — small windows stay usable; cloud saves tokens |
+| **New sessions don't carry old facts**: resume/fork only continues an old conversation; a fresh session still doesn't know who you are, what you did, prior decisions | Auto-extract to a persistent layer, inject on demand in new sessions to restore key context |
+| **History isn't searchable/governable**: session logs are raw text — can't ask "what preference did I state before?" | Structured memory cards + relevance-ranked retrieval + tiered injection + governance loop |
+| **Memory can't be trusted**: model "remembering" may be hallucination | Zero-LLM relevance retrieval on read; evidence tags + provenance on write; low-confidence goes to human review |
+| **Data black box**: memory locked in a database/vector store, unreadable/uneditable | Plain-Markdown source of truth, readable/editable/portable |
+| **Memory bloat**: grows without bound, noise drowns signal | Decay curve (30-day idle branches end) + utilization governance + weight fade |
+| **No ROI visibility**: installed memory plugin, unclear if it helps | Audit tab: injection hit rate / utilization / extraction cost — quantified loop |
 
-### 价值
+### Values
 
-- **对对话质量**：关键轮次注入相关记忆（偏好、项目背景、既定决策），减少重复说明与前后矛盾——模型基于检索到的记忆回应，而非凭空"记得"。
-- **对成本**：注入按需限量 + 寒暄零注入 + 提取门卫（寒暄轮跳过 LLM 提取），记忆不成为每轮的 token 负担；KV-cache 友好（常驻基线 digest 未变不重建）。
-- **对可靠性**：记忆是独立数据层而非模型自律——检索可复现、写入可溯源、治理可审计；即使提取失败，原始对话永远在 `runs` 表。
-- **对掌控感**：数据明文在本地，可人工编辑/删除；经验与画像经人工审批才固化；全部决策写 `decision_log`。
-
----
-
-## 设计理念
-
-**一句话：记忆是独立可靠的数据层，不是模型自律的产物。**
-
-四条原则：
-
-1. **明文为真源，索引只做加速**。每张记忆卡是一个 Markdown 文件，SQLite 只是可重建的检索索引——数据不锁死、可人工编辑、索引坏了不丢数据。
-2. **确定性算法检索，读取端零 LLM**。读取端（检索）零 LLM：BM25 + 多路 RRF 融合，同一数据状态下结果可复现、可审计。LLM 只参与写入端（从对话提取），不确定性被关在写入管道里。
-3. **提取主动写，注入克制读**。每轮对话自动提取（LLM + 零 LLM 规则双通道）；注入按对话意图分档（关键 ≤3 条、一般 ≤1 条、寒暄 0 条），记忆是"按需翻阅"不是"无脑塞进上下文"。
-4. **遗忘是记忆的一部分**。30 天闲置枝完结、低利用卡降权、关键事实豁免——遗忘由规则驱动，可解释、可翻查、可恢复。
-
-**记忆树形态**：记忆不是平铺列表，而是按时间生长的树——**枝 = 事件链（主题演进），叶 = 事件卡（发生了什么）**；事件完结生成"果摘要"作为导航路标；版本演化走 `supersedes` 时序链（旧事实失效但保留审计）；每条卡带溯源（来源文件 / 回合 / 证据标签 / 佐证计数），**可回到原始对话**。
-
-**记忆与知识分离**：`memory-tree`（关于"你"的经历）与 `memory-wiki`（关于"世界"的规范）是两个独立库，知识条目不进记忆树，避免污染画像与经历。
+- **Conversation quality**: relevant memories (preferences, project context, accepted decisions) are injected at key turns, reducing repeated explanations and contradictions — the model responds from retrieved memory, not from mere recall.
+- **Cost**: tiered capped injection + zero-injection greetings + extraction gate (skip LLM on chit-chat) keep memory from becoming a per-turn token burden; KV-cache friendly (resident baseline digest unchanged → no rebuild).
+- **Reliability**: memory is an independent data layer, not model discipline — retrieval reproducible, writes traceable, governance auditable; even if extraction fails, the raw conversation stays in the `runs` table.
+- **Control**: plain-text local data, manually editable/deletable; lessons and profiles solidify only after human approval; every decision is written to `decision_log`.
 
 ---
 
-## 重大决策
+## Design philosophy
 
-| 决策 | 选择 | 理由（反对方案） |
+**In one sentence: memory is an independent, reliable data layer — not a product of model discipline.**
+
+Four principles:
+
+1. **Plain text as source of truth, index as acceleration only.** Each memory card is a Markdown file; SQLite is only a rebuildable retrieval index — data is not locked away, is manually editable, and survives index loss.
+2. **Deterministic-algorithm retrieval, zero-LLM read path.** Retrieval is zero-LLM: BM25 + multi-way RRF fusion, reproducible and auditable for the same data state. LLM participates only on the write side (extraction); uncertainty is confined to the write pipeline.
+3. **Write actively, read sparingly.** Every turn auto-extracts (LLM + zero-LLM rule dual channel); injection is tiered by conversational intent (key ≤3, general ≤1, greetings 0) — memory is "consulted on demand", not blindly stuffed into context.
+4. **Forgetting is part of memory.** 30-day idle branches end, low-utilization cards fade, key facts are exempt — forgetting is rule-driven, explainable, traceable, recoverable.
+
+**Memory-tree shape**: memory is not a flat list but a tree growing over time — **branches = event chains (topic evolution), leaves = event cards (what happened)**; when a branch ends it produces a "fruit summary" as a navigation landmark; version evolution uses `supersedes` temporal chains (old facts invalidated but kept for audit); every card carries provenance (source file / turn / evidence tag / corroboration count) — **each memory can be traced back to the original conversation**.
+
+**Memory vs knowledge separation**: `memory-tree` (about *you* — experiences) and `memory-wiki` (about *the world* — norms) are two separate stores; knowledge entries never enter the memory tree, so profile and experience aren't polluted.
+
+---
+
+## Key decisions
+
+| Decision | Choice | Rationale (rejected alternative) |
 |---|---|---|
-| 记忆存储 | Markdown 真源 + SQLite 索引 | 纯数据库不可读不可人工核对；纯文件检索慢。双写兼顾透明与速度 |
-| 检索算法 | BM25 + RRF（jieba 分词 + FTS5）| 向量库需模型常驻、结果不可复现、依赖外部服务；词级相关度排序 + 多跳扩展对记忆场景足够且可审计 |
-| 写入管线 | LLM 提取 + 零 LLM 规则（双通道）| 单一 LLM 提取慢且贵；规则通道让"记住/踩坑/偏好"即时落卡 |
-| 读取注入 | 拉式检索 + 常驻基线，分档限量 | 全量注入污染上下文、稀释注意力 |
-| 真值裁决 | LLM 只输出"证据标签"，系统算置信、做准入 | 模型自评当事实源会放大幻觉；directive/explicit 自动固化，uncertain 强制人工审 |
-| 归链 | 确定性裁决（`resolve_chain`，别名/相似度/实体消歧）| 直接哈希 LLM 标题会因措辞漂移分裂成"同名假链" |
-| 对话保底 | 原始对话先落盘 `runs` 表，幂等状态机 | 提取失败/禁用都不删原文——记忆管道出错，原始语料永远在 |
-| 进程模型 | host JS + Python sidecar（进程隔离）| 引擎生态成熟；sidecar 崩溃只影响记忆，不拖垮 harness |
-| Python 依赖 | 声明式（`install-deps.ps1`），不内嵌、不静默安装 | 静默 pip install = 在用户机器执行任意代码 |
-| 密钥 | `apiKeyEnv` 环境变量优先，明文回退兼容 | 明文 key 不落盘入库；`.gitignore` 排除 `config.json` |
+| Memory storage | Markdown source of truth + SQLite index | Pure DB is unreadable/not manually checkable; pure files are slow to search. Dual write balances transparency and speed |
+| Retrieval algorithm | BM25 + RRF (jieba tokenization + FTS5) | Vector DB requires a resident model, non-reproducible results, external dependency; word-level relevance ranking + multi-hop expansion suffices for memory and is auditable |
+| Write pipeline | LLM extraction + zero-LLM rules (dual channel) | LLM-only extraction is slow and costly; the rule channel makes "记住/踩坑/preferences" land instantly |
+| Read injection | Pull retrieval + resident baseline, tiered & capped | Full-history injection pollutes context and dilutes attention |
+| Truth adjudication | LLM outputs only "evidence tags"; the system computes confidence and gates admission | Model self-assessment as fact source amplifies hallucination; directive/explicit auto-commit, uncertain forces human review |
+| Chain attribution | Deterministic (`resolve_chain`, alias/similarity/entity disambiguation) | Hashing the LLM title directly would silently split into "same-name fake chains" under wording drift |
+| Conversation safety net | Raw conversation lands in the `runs` table first, idempotent state machine | Extraction failure/disable never deletes the original — if the memory pipeline fails, raw material is always there |
+| Process model | host JS + Python sidecar (process isolation) | Mature engine ecosystem; a sidecar crash only affects memory, not the harness |
+| Python deps | Declarative (`install-deps.ps1`), not bundled, no silent install | Silent pip install = running arbitrary code on the user's machine |
+| Secrets | `apiKeyEnv` env var preferred, plaintext fallback for compatibility | Plaintext keys must not land in the repo; `.gitignore` excludes `config.json` |
 
 ---
 
-## 关键工程实现
+## Key engineering implementation
 
-### 架构
+### Architecture
 
 ```
-DeepSeek Harness (host 插件进程)
-├── lib/index.js                宿主：拉起 sidecar、HTTP 路由、agent 工具、
-│                               事件钩子（自动提取 / 零 LLM recorder / 注入 / 审计闭环）
-├── python/memory_bridge_server.py  sidecar：JSON-RPC over HTTP（127.0.0.1 随机端口），
-│                                   承载引擎、衰减治理、画像蒸馏
-├── engine/                     记忆树引擎源码（core/ + memory/，依赖声明式安装）
-└── client/client.js            设置页 UI（7 tab，浏览器直连 host 代理）
+DeepSeek Harness (host plugin process)
+├── lib/index.js                host: spawns sidecar, HTTP routes, agent tools,
+│                               event hooks (auto-extract / zero-LLM recorder / inject / audit loop)
+├── python/memory_bridge_server.py  sidecar: JSON-RPC over HTTP (127.0.0.1 random port),
+│                                   hosts the engine, decay governance, profile distillation
+├── engine/                     memory-tree engine source (core/ + memory/, declarative deps)
+└── client/client.js            Settings UI (7 tabs, browser talks to the host proxy)
 ```
 
-### 存储层：明文真源 + 幂等写
+### Storage: plain-text source + idempotent writes
 
-- 卡 = Markdown 文件（front matter 元数据 + 正文），目录按类型分（`events/cards`、`events/chains`、`lessons/pending`、`lessons/permanent`、`profiles`）
-- 全部写操作幂等（同 id 覆盖 / `INSERT OR IGNORE`），崩溃重启对账（`extracting` 回滚为 `staged`）
-- 溯源字段贯穿：`source_path`（文件）、`trace_event_id`（回合）、`evidence`（证据标签）、`corroborations`（佐证）
+- Card = Markdown file (front-matter metadata + body), directories by type (`events/cards`, `events/chains`, `lessons/pending`, `lessons/permanent`, `profiles`)
+- All writes idempotent (same-id overwrite / `INSERT OR IGNORE`), crash-recovery reconciliation (`extracting` rolled back to `staged`)
+- Provenance fields throughout: `source_path` (file), `trace_event_id` (turn), `evidence` (tag), `corroborations` (count)
 
-### 写入管线（双通道）
+### Write pipeline (dual channel)
 
-1. **LLM 提取**（turn/end 自动）：增量扫本轮 user+assistant 文本 → 入 `runs` 队列 → 门卫 `should_extract`（零 LLM，寒暄轮标记 skipped 省调用）→ LLM 提取 → 事件卡/经验/知识分流落库 → 归链 → 冲突裁决 → 失败退避。JSON 输出有截断容错（补引号/插逗号/补闭合括号）。
-2. **零 LLM 规则 recorder**（user/message 即时，纯规则不抢 TTFT）：
-   - "记住教训/踩坑/经验教训" → **立即 lesson_permanent**（永久经验）
-   - "记住/记下/别忘了" → 立即事件卡
-   - "我喜欢/习惯/别用" → 偏好信号入账 → 聚合 ≥3 同类 → lesson_pending 提案
+1. **LLM extraction** (auto on turn/end): incrementally scan this turn's user+assistant text → enqueue into `runs` → gate `should_extract` (zero-LLM; chit-chat turns marked `skipped` to save calls) → LLM extraction → events/lessons/knowledge routed and stored → chain attribution → conflict resolution → backoff on failure. JSON output has truncation tolerance (fix quotes/commas/closing brackets).
+2. **Zero-LLM rule recorder** (instant on user/message, pure rules, doesn't steal TTFT):
+   - "记住教训/踩坑/经验教训" → **lesson_permanent immediately** (permanent lesson)
+   - "记住/记下/别忘了" → event card immediately
+   - "我喜欢/习惯/别用" → preference signal ledger → aggregate ≥3 of the same topic → lesson_pending proposal
 
-### 读取管线（注入 + 审计闭环）
+### Read pipeline (injection + audit loop)
 
-- **user/message 预取**：检索相关记忆（L2 ≤3 / L1 ≤1 / 寒暄 L0 零注入，50ms 超时宁缺勿滥）+ **常驻基线快照**（approved 画像 + 高置信永久经验，digest 变更检测、KV-cache 友好）→ 缓存 → system prompt 渲染时注入带溯源文本
-- **审计闭环**：turn 结束后判定注入是否被回复利用（规则归因零 LLM）→ 命中滚动 / 连续 ≥3 次未命中降权淡出（"没被利用" ≠ "记忆错误"）
+- **user/message prefetch**: retrieve relevant memories (L2 ≤3 / L1 ≤1 / greetings L0 zero-inject, 50ms timeout — better none than late) + **resident baseline snapshot** (approved profile + high-confidence permanent lessons, digest change detection, KV-cache friendly) → cache → injected into system prompt render with provenance text
+- **Audit loop**: after turn end, judge whether injected memory was actually used in the reply (rule-based attribution, zero-LLM) → hit rolls / ≥3 consecutive misses fade weight ("not used" ≠ "memory wrong")
 
-### 生命周期治理（规则驱动，零 LLM）
+### Lifecycle governance (rule-driven, zero-LLM)
 
-- **遗忘曲线**：30 天闲置枝自动完结、子卡枯萎（`status=wilted`、排除检索但保留数据）
-- **全局治理**：`inject_used_rate < 0.3` → 自动收缩注入条数（3→2→1）；动作写 `decision_log` 可审计
-- **安全豁免**：lesson_permanent / approved / explicit / directive / 佐证 ≥1 的卡豁免衰减
+- **Decay curve**: 30-day idle branches auto-end, child cards wilt (`status=wilted`, excluded from retrieval but data retained)
+- **Global governance**: `inject_used_rate < 0.3` → auto-shrink injection count (3→2→1); actions written to `decision_log` for audit
+- **Safety exemption**: lesson_permanent / approved / explicit / directive / corroborated ≥1 cards are exempt from decay
 
-### 画像蒸馏
+### Profile distillation
 
-- 手动触发（UI「画像」tab 或 RPC `distill`）：收集事件树 → LLM 生成画像摘要 + 用户人格维度（MBTI + 8 轴，属画像数据而非 persona 库）→ 防抖/去重 → 草稿 → **人工采纳**固化（version+1，草稿移入 `approved/` 防重复采纳）→ 进入注入常驻基线
-- 画像 = 常驻注入的用户画像信息：每轮对话的 system prompt 携带画像摘要（身份/偏好/协作方式），作为模型的稳定用户背景
+- Manual trigger (Profile tab or RPC `distill`): collect event tree → LLM generates profile summary + user personality dimensions (MBTI + 8 axes, profile data not a persona library) → debounce/dedup → draft → **human approval** solidifies (version+1, draft moved to `approved/` to prevent repeat approval) → enters the injection resident baseline
+- Profile = resident injected user profile info: each turn's system prompt carries the profile summary (identity/preferences/collaboration style) as stable user background
 
-### 工程保障
+### Engineering safeguards
 
-- **故障隔离**：sidecar 崩溃只影响记忆，不拖垮 harness；jieba 缺失时返回可操作安装指引而非崩溃
-- **安全**：POST 严格同源校验；GET 无 Origin 须带本地标记 header（防跨站状态污染）；RPC 参数路径穿越白名单；Sidecar 仅监听 127.0.0.1；密钥脱敏回显 + `apiKeyEnv` 渐进迁移
-- **可移植**：引擎路径自动探测（env → config → 自动），Python 可执行文件同理；无 Node 原生依赖
-- **可测试**：独立冒烟脚本（真实 spawn sidecar）、引擎 324 个单元测试、JSON 修复器专项用例
-
----
-
-## 特色
-
-- **为受限上下文而生**：本地模型窗口 4K-32K 也能有可用的长期记忆——注入只带相关几条，不靠大窗口硬扛（云端 1M 窗口下同样省 token）
-- **本地零外部服务**：读取端（检索/注入/治理）零 LLM、零向量库、零外部依赖；写入端可选本地模型或云端 API（mode 决定）
-- **记忆与知识分离**：记忆 = 关于"你"的经历（会变、有时效）；知识 = 关于"世界"的规范（稳定、可复用）。**分开存是为了检索不被污染**——搜规范时不会翻出私人经历，反之亦然；两者检索策略也不同（记忆 BM25+RRF，知识条文级倒排）
-- **树状组织、弱图谱关系**：事件按**链**聚合（枝=主题演进，叶=单次事件）。树是**确定性归链**（resolve_chain，标题/别名/实体消歧），图谱只是树的可视化投影——不强依赖实体关系网（实体关系提取难且不稳），用确定性的"归属链"组织记忆
-- **记忆会"生长"**：事件 → 事件链 → 经验 → 画像的蒸馏路径，不是日志堆积
-- **双通道写入**：LLM 提取的广度 + 规则即时响应的速度（"记住教训"立即沉淀）
-- **克制注入**：按意图分档 + 常驻基线 + 审计反馈，控制注入量、避免占满上下文
-- **可视化**：力导向事件图谱 / 知识图谱 / 时间线，图谱与树联动
+- **Fault isolation**: sidecar crash affects only memory, not the harness; missing jieba returns an actionable install hint instead of crashing
+- **Security**: POST strict same-origin check; GET without Origin must carry the local-marker header (blocks cross-site state pollution); RPC param path-traversal whitelist; sidecar listens only on 127.0.0.1; secrets masked on read + `apiKeyEnv` gradual migration
+- **Portability**: engine path auto-detection (env → config → auto), same for the Python executable; no Node native deps
+- **Testability**: standalone smoke script (spawns the real sidecar), 324 engine unit tests, dedicated JSON-fixer cases
 
 ---
 
-## 已知局限
+## Features
 
-**如实披露**（非 bug，是设计边界或未完成项）：
+- **Built for constrained contexts**: local models with 4K-32K windows still get usable long-term memory — inject only the relevant few, don't brute-force a big window (cloud also saves tokens on a 1M window)
+- **Local, zero external service**: read path (retrieval/injection/governance) is zero-LLM, zero-vector-DB, zero external dependency; write path can use a local model or cloud API (mode decides)
+- **Memory vs knowledge separation**: memory = about *you* (changes, time-bound); knowledge = about *the world* (stable, reusable). **Separate stores so retrieval isn't polluted** — searching norms won't surface private experiences and vice versa; retrieval strategies differ too (memory BM25+RRF, knowledge clause-level inverted index)
+- **Tree organization, weak graph**: events aggregate by **chain** (branch = topic evolution, leaf = single event). The tree is **deterministic chain attribution** (`resolve_chain`, title/alias/entity disambiguation); the graph is just a visualization projection of the tree — it doesn't depend on a fragile entity-relationship web
+- **Memory "grows"**: event → event chain → lesson → profile distillation path, not log accumulation
+- **Dual-channel write**: LLM extraction breadth + rule instant response ("记住教训" lands immediately)
+- **Restrained injection**: tiered by intent + resident baseline + audit feedback — controls injection volume, avoids filling the context
+- **Visualization**: force-directed Event Graph / Knowledge Graph / Timeline, graph-tree linkage
 
-| 项 | 状态 | 说明 |
+---
+
+## Known limitations
+
+**Honestly disclosed** (not bugs — design boundaries or unfinished items):
+
+| Item | Status | Note |
 |---|---|---|
-| 提取质量依赖所选 LLM | 设计边界 | 写入端用 LLM，选错模型（如 reasoner 思考模型）会污染提取；默认预设已关思考，文档有"非思考模型"选型建议 |
-| 检索是词级相关度召回，非语义联想 | 设计边界 | BM25+RRF 按词命中相关度排序（含沿链/实体多跳扩展），对**措辞漂移**召回有限（靠别名/归链缓解），不适合"语义联想"类查询（如"和上次那个类似的东西"）|
-| 画像蒸馏为手动触发 | 未完成 | `DistillWorker`（每周 + idle 门槛自动调度）已实现，sidecar 未启动后台线程，当前需手动点「蒸馏画像」 |
-| `persona.py`（引擎内置人格库）| 刻意不接线 | agent 人格由 **DSH 侧 persona 插件/系统提示词**管理（引擎 README §9.5 明确不迁移清单）；本插件只负责"记忆"，不负责"分身人格" |
-| 偏好信号需 ≥3 次同类提及才提案 | 设计边界 | 避免单次随口一说即沉淀；反复表达才入 pending |
-| 本地小模型边缘波动 | 设计边界 | 4B 级本地模型在规范条文/别名等边缘用例有波动，云端全绿，低置信走 pending 人工兜底 |
+| Extraction quality depends on the chosen LLM | Design boundary | Write side uses LLM; picking the wrong model (e.g. a reasoner/thinking model) pollutes extraction; the default preset disables thinking, and the docs give a "non-thinking model" selection guide |
+| Retrieval is word-level relevance ranking, not semantic association | Design boundary | BM25+RRF ranks by word hits (with along-chain/entity multi-hop expansion); recall under **wording drift** is limited (mitigated by aliases/chain attribution); not suited to "semantic-association" queries |
+| Profile distillation is manual-triggered | Not finished | `DistillWorker` (weekly + idle-gate auto scheduling) is implemented but the sidecar doesn't start the background thread; currently click "Distill profile" manually |
+| `persona.py` (engine's built-in persona library) | Deliberately not wired | Agent personality is managed by **DSH's own persona plugin / system prompt** (engine README §9.5 exclusion list); this plugin handles memory, not agent persona |
+| Preference signals need ≥3 same-topic mentions to propose | Design boundary | Avoids a one-off mention becoming a permanent card; only repeated expression enters pending |
+| Small local-model edge cases | Design boundary | 4B-class local models fluctuate on spec-clause/alias edge cases; cloud is fully green; low confidence goes to pending human review |
 
 ---
 
-## 安装
+## Installation
 
-要求：DSH 0.1.0-rc.7+、Python 3.10+（无 Node 原生依赖）。
+### Supported versions
+
+| Dependency | Version | Basis |
+|---|---|---|
+| DeepSeek Harness | **0.1.0-rc.7+** | Plugin depends on `@deepseek-ai/dsh-tools@^0.1.0-rc.7`; the 5 injected client services (connection/runtime/locale/ui-settings/ui-theme) are verified working on rc.7 |
+| Python | 3.10+ | sidecar uses `X \| Y` type syntax (3.10+) |
+| Node native deps | none | pure-JS host + Python sidecar |
+
+> Note: pre-rc.7 versions are unverified (the settings mount mechanism changed in rc.7); rc.7 or later is recommended.
 
 ```bat
-:: 1) 从 GitHub 安装
+:: 1) Install from GitHub
 dsh plugin --profile web add github:<owner>/dsh-memory-bridge
 
-:: 2) 安装 Python 依赖（jieba 分词，声明式；清华镜像，失败自动回退阿里云）
-pwsh <你的插件目录>/engine/install-deps.ps1
+:: 2) Install Python deps (jieba tokenization, declarative; Tsinghua mirror, falls back to Aliyun)
+pwsh <your-plugin-dir>/engine/install-deps.ps1
 ```
 
-重启 harness 后生效。卸载：`dsh plugin --profile web remove dsh-memory-bridge`
+Restart the harness to activate. Uninstall: `dsh plugin --profile web remove dsh-memory-bridge`
 
-> 已带 `dsh-plugin` / `dsh-category-memory` topics——可从 **DSH 设置 → 插件市场（Marketplace）** 的 memory 分类下发现并一键安装。
+> Carries the `dsh-plugin` / `dsh-category-memory` topics — discoverable and one-click installable under the memory category in **DSH Settings → Plugins → Marketplace**.
 
-> 依赖策略：jieba 走声明式安装，不内嵌、不在安装时静默 pip install；缺失时 sidecar 返回可操作指引，不拖垮 harness。
-
----
-
-## 配置（设置页 → 记忆 → 提取配置）
-
-| 项 | 说明 |
-|---|---|
-| mode | `off` 纯规则 / `local` 本地模型 / `cloud` 云端记忆 API / `main` 主对话模型兜底 / `hybrid` 本地优先·云端兜底 |
-| local.preset | `qwen3-it-4b-flm`（推荐，内置关思考）或 `custom`（自填 baseUrl/model/apiKey/apiKeyEnv）|
-| cloud.* | 云端记忆 API（baseUrl / model / apiKey / apiKeyEnv / batchSize / maxCallsPerMinute）|
-| sanitize | 提取前脱敏（手机号/邮箱/身份证/密钥），云端默认开启 |
-
-- **模型选择**：提取/注入用**非思考模型**最稳（reasoning 输出推理链会污染 JSON 提取）；默认预设已关思考；custom 请选 instruct 变体；云端用 `deepseek-chat` 勿用 `deepseek-reasoner`
-- **API key**：`apiKeyEnv` 环境变量优先，回退明文；回读一律脱敏；配置先校验后落盘
+> Dependency policy: jieba is declarative — not bundled, no silent pip install at install time; when missing, the sidecar returns an actionable hint instead of crashing the harness.
 
 ---
 
-## UI（设置页 → 记忆）
+## Configuration (Settings → Memory → Extraction config)
 
-| Tab | 内容 |
+| Item | Meaning |
 |---|---|
-| 总览 | 统计 / 状态 / 审计摘要 / 最近活动 |
-| 事件图谱 | 力导向图 + 记忆树导航联动、孤立节点/实体开关、方向箭头流动线 |
-| 知识图谱 | wiki 条目力导向图（上位/版本关系）+ 搜索 + 列表 |
-| 时间线 | 事件流按日分组（今天/昨天/2-6 天前），倒序 |
-| 待审 | 提取队列 / pending 经验审批 |
-| 画像 | 已审批画像 + 「蒸馏画像」 + 草稿采纳/驳回 |
-| 审计 | 注入/提取统计 + 「立即维护」 + 决策日志 |
+| mode | `off` rules-only / `local` local model / `cloud` cloud memory API / `main` main-chat-model fallback / `hybrid` local-first·cloud-fallback |
+| local.preset | `qwen3-it-4b-flm` (recommended, thinking off) or `custom` (fill baseUrl/model/apiKey/apiKeyEnv) |
+| cloud.* | Cloud memory API (baseUrl / model / apiKey / apiKeyEnv / batchSize / maxCallsPerMinute) |
+| sanitize | Pre-extraction sanitization (phone/email/ID/secrets), on by default for cloud |
 
-## 界面预览
+- **Model selection**: **non-thinking models** are most stable for extraction/injection (reasoning chains pollute JSON extraction); the default preset disables thinking; for `custom` pick an instruct variant; for cloud use `deepseek-chat`, not `deepseek-reasoner`
+- **API key**: `apiKeyEnv` env var preferred, plaintext fallback; masked on read-back; config validated before saving
+
+---
+
+## UI (Settings → Memory)
+
+| Tab | Content |
+|---|---|
+| Overview | stats / status / audit summary / recent activity |
+| Event Graph | force-directed graph + memory-tree nav linkage, isolated-node/entity toggles, directional arrow flows |
+| Knowledge Graph | wiki-entry force graph (parent/version relations) + search + list |
+| Timeline | event stream grouped by day (today/yesterday/2-6 days ago), descending |
+| Review | extraction queue / pending lesson approval |
+| Profile | approved profile + "Distill profile" + draft approve/reject |
+| Audit | injection/extraction stats + "Maintain now" + decision log |
+
+## Screenshots
 
 | | |
 |---|---|
-| **总览**：统计卡片 / 记忆构成 / 本地推理状态 / 提取注入审计 / 配置表单 | **事件图谱**：力导向图 + 记忆树联动导航 |
-| ![总览](docs/screenshots/overview.png) | ![事件图谱](docs/screenshots/event-graph.png) |
-| **审计**：注入/提取统计 + 手动维护 + 决策日志 | |
-| ![审计](docs/screenshots/audit.png) | |
+| **Overview**: stat cards / memory composition / local inference status / extraction-injection audit / config form | **Event Graph**: force-directed graph + memory-tree linked nav |
+| ![Overview](docs/screenshots/overview.png) | ![Event Graph](docs/screenshots/event-graph.png) |
+| **Audit**: injection/extraction stats + manual maintenance + decision log | |
+| ![Audit](docs/screenshots/audit.png) | |
 
 ---
 
-## Agent 工具
+## Agent tools
 
-| 工具 | 用途 |
+| Tool | Purpose |
 |---|---|
-| `memory_search` | 确定性算法检索记忆卡（BM25+RRF，零 LLM），返回链上下文与反馈提示 |
-| `memory_add_run` | agent 主动把当前轮写入 run 队列（可指定 tier）|
-| `memory_review` | 查看待提取 run 队列 / 指定 run 状态 |
+| `memory_search` | Deterministic-algorithm retrieval of memory cards (BM25+RRF, zero-LLM), returns chain context and feedback hints |
+| `memory_add_run` | Agent actively writes the current turn into the run queue (tier selectable) |
+| `memory_review` | View the pending extraction queue / a specific run's status |
 
 ---
 
 ## HTTP API
 
-- `GET`：`overview` `health` `search?q=` `browse?kind=` `card?id=` `review?runId=` `wiki?q=` `config` `lemonade-status` `audit` `graph` `profile-status`（需 `x-dsh-memory: 1` header 或同源 Origin）
-- `POST`：`card-action` `add-run` `config` `lemonade-ensure` `extract` `maintenance` `distill` `distill-approve` `distill-reject`（同源校验）
-- `inject` / `recordUsage` / `recorder` 不暴露为 HTTP 路由：宿主在事件钩子内部直连 sidecar
+- `GET`: `overview` `health` `search?q=` `browse?kind=` `card?id=` `review?runId=` `wiki?q=` `config` `lemonade-status` `audit` `graph` `profile-status` (needs `x-dsh-memory: 1` header or same-origin)
+- `POST`: `card-action` `add-run` `config` `lemonade-ensure` `extract` `maintenance` `distill` `distill-approve` `distill-reject` (same-origin check)
+- `inject` / `recordUsage` / `recorder` are not HTTP routes: the host calls the sidecar directly inside event hooks
 
 ---
 
-## 开发与测试
+## Development & testing
 
 ```bat
-REM 独立启动 sidecar（脱离 harness 联调）
-python -u <插件目录>\python\memory_bridge_server.py --root <引擎目录> --config <插件目录>\config.example.json
+REM Run the sidecar standalone (outside the harness)
+python -u <plugin-dir>\python\memory_bridge_server.py --root <engine-dir> --config <plugin-dir>\config.example.json
 
-REM 冒烟测试（bundled engine 缺 jieba → 可操作指引；本地引擎 → 全功能）
+REM Smoke test (bundled engine missing jieba → actionable hint; local engine → full function)
 python smoke_sidecar.py
 
-REM 引擎单元测试（324 个）
-python -m pytest <引擎目录>\tests -q
+REM Engine unit tests (324)
+python -m pytest <engine-dir>\tests -q
 ```
