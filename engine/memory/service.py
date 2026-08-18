@@ -60,8 +60,8 @@ def build_extractor(
     - main：主对话模型兜底（默认），需注入 main_backend=ctx.llm（DSH 侧装配时传）
     - hybrid：本地优先、超长降级云端（扩展装配，非默认 mode）
     开关激活后才校验必填项——绝不静默用错误默认值。
-    temperature/max_tokens：覆盖提取温度与输出预算（V3.5 wiki 双分支默认 1024，
-    见 PROMPT-EVALUATION §6；如需更大输出传 max_tokens 覆盖）。
+    temperature/max_tokens：覆盖提取温度与输出预算（默认 2048，见 PROMPT-EVALUATION
+    §6 与抢救修复 v0.3——1024 曾致 wiki 双分支输出截断；如需更大输出传 max_tokens 覆盖）。
     """
     ex_kwargs: dict[str, object] = {}
     if temperature is not None:

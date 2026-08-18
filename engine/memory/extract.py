@@ -150,6 +150,21 @@ def extract_json_object(text: str) -> dict:
     """模型 JSON 输出容错解析：剥代码围栏、取首 { 到末 }、json.loads。
 
     P2：公开化（distill/fruit 跨模块复用——私有名跨模块导入是循环导入引爆点）。
+    截断容错（P2）：LLM 输出被 max_tokens 截断（Unterminated string / 未闭合括号）时，
+    尝试修复后再解析——重试一次补齐字符串 + 补全闭合括号，仍失败才抛错。
+    """
+    payload, _ = _extract_json_object_detailed(text)
+    return payload
+
+
+def _extract_json_object_detailed(text: str) -> tuple[dict, bool]:
+    """同 extract_json_object，额外返回 repaired 标志。
+
+    抢救修复（v0.3）：json.loads 失败后经 _repair_truncated_json 修复成功，
+    说明原始输出不是合法 JSON——大概率被 max_tokens 截断（结构被补齐但内容
+    可能残缺，修复成功会掩盖截断）。调用方拿到 repaired=True 必须降级处理：
+    强制 evidence=uncertain → 卡进 lesson_pending / wiki 进 pending（待审），
+    残缺内容不得自动固化进永久记忆。
     """
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -161,13 +176,98 @@ def extract_json_object(text: str) -> dict:
     end = cleaned.rfind("}")
     if start != -1 and end > start:
         cleaned = cleaned[start : end + 1]
-    payload = json.loads(cleaned)
+    repaired = False
+    try:
+        payload = json.loads(cleaned)
+    except (ValueError, TypeError):
+        # 截断容错：尝试修复未闭合字符串与括号（LLM 输出常被 max_tokens 截断）
+        repaired = True
+        repaired_text = _repair_truncated_json(cleaned)
+        try:
+            payload = json.loads(repaired_text)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"JSON parse failed after truncation repair: {exc}") from exc
     if isinstance(payload, list):
         # V3.5：模型"无可提取"会输出裸 []（v2 时是 {}）——视为空提取，不炸
-        return {}
+        return {}, repaired
     if not isinstance(payload, dict):
         raise ValueError("JSON top level is not an object")
-    return payload
+    return payload, repaired
+
+
+def _repair_truncated_json(text: str) -> str:
+    """修复截断 JSON：补全未闭合字符串的引号、转义尾随反斜杠、补全闭合括号。
+
+    策略（逐字符扫描，够用即可，不追求完整 JSON 修复）：
+    - 奇数个未配对 `"` → 在末尾补 `"`；
+    - 末尾是孤立 `\\` → 移除（避免"字符串以反斜杠结尾"）；
+    - 字符串结束后紧跟 `}`/`]`（缺逗号）→ 插逗号；
+    - 计数 { [ ( 与 } ] )，差量补全闭合。
+    """
+    if not text:
+        raise ValueError("empty JSON")
+    # 去掉末尾孤立反斜杠（`...\` 是未转义的反斜杠，json 会拒）
+    while text.endswith("\\"):
+        text = text[:-1]
+    in_str = False
+    escaped = False
+    out: list[str] = []
+    # 记录"上一个非空白字符"，用于判断字符串结束是否紧贴闭合符
+    last_significant = ""
+    for ch in text:
+        if in_str:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_str = False
+            else:
+                last_significant = ch
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            last_significant = ""
+        elif ch in " \t\r\n":
+            out.append(ch)
+        elif ch in "}],":
+            # 前一个非空白字符是字符串结束引号且当前是闭合符 → 缺逗号
+            if last_significant == '"' and ch in "}],":
+                out.append(",")
+            out.append(ch)
+            last_significant = ch
+        else:
+            out.append(ch)
+            last_significant = ch
+    if in_str:
+        out.append('"')  # 字符串未闭合 → 补引号
+    repaired = "".join(out)
+    # 用栈追踪未闭合符顺序，按 LIFO 补全正确闭合（`[{"` → `}]}`）
+    stack: list[str] = []
+    in_s = False
+    esc = False
+    for ch in repaired:
+        if in_s:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_s = False
+            continue
+        if ch == '"':
+            in_s = True
+        elif ch in "{([":
+            stack.append(ch)
+        elif ch in "})]":
+            if stack:
+                stack.pop()
+    close_map = {"{": "}", "[": "]", "(": ")"}
+    for open_ch in reversed(stack):
+        repaired += close_map[open_ch]
+    return repaired
 
 
 # 向后兼容别名（README §9.8 将 _extract_json_object 列为 DSH 侧复用点）
@@ -237,7 +337,7 @@ class LLMExtractor:
         fallback_backend: Backend | None = None,
         strategy: ExtractStrategy | None = None,
         temperature: float = 0.0,
-        max_tokens: int = 1024,  # V3.5 wiki 双分支输出更长（PROMPT-EVALUATION §6 建议 1024）
+        max_tokens: int = 2048,  # 抢救修复（v0.3）：1024 曾致 wiki 双分支输出被截断（详见 PROMPT-EVALUATION §6；截断卡已入库）→ 提至与批量一致
         prompt: str | None = None,  # 提示词变体：缺省全量；小模型（本地轨）由装配方注入精简版
     ) -> None:
         self.backend = backend
@@ -280,7 +380,7 @@ class LLMExtractor:
         except Exception as exc:  # noqa: BLE001 - 端点不可用（含云端失败）
             raise ExtractError(f"后端调用失败: {exc}") from exc
         try:
-            payload = _extract_json_object(resp.text)
+            payload, json_repaired = _extract_json_object_detailed(resp.text)
             raw_cards = payload.get("cards")  # 模型正确判"无可提取"时返回空对象，视为零卡
             if raw_cards is None:
                 raw_cards = []
@@ -292,9 +392,14 @@ class LLMExtractor:
             raise ExtractError(
                 f"提取 JSON 解析失败: {exc} (raw={resp.text[:200]!r})"
             ) from exc
+        # 抢救修复（v0.3）：截断检测双信号——后端 finish_reason=length（明确截断）
+        # 或 JSON 需结构修复（大概率被 max_tokens 截断）。截断产出的卡/wiki 一律
+        # 降级 evidence=uncertain → lesson_pending / pending（待审），残缺内容
+        # 不得自动固化进永久记忆（此前修复器成功会掩盖内容残缺）。
+        truncated = (getattr(resp, "finish_reason", "") or "") == "length" or json_repaired
         return ExtractionResult(
-            cards=self._cards_from_raw(run, raw_cards),
-            wiki_entries=self._wiki_from_raw(run, raw_wiki),
+            cards=self._cards_from_raw(run, raw_cards, truncated=truncated),
+            wiki_entries=self._wiki_from_raw(run, raw_wiki, truncated=truncated),
         )
 
     def _turn_cap(self, run: MemoryRun, decision=None) -> int:
@@ -334,10 +439,12 @@ class LLMExtractor:
         ]
         try:
             resp = self.backend.complete(messages, temperature=0.0, max_tokens=2048)
-            payload = _extract_json_object(resp.text)
+            payload, json_repaired = _extract_json_object_detailed(resp.text)
             results = payload["results"]
         except Exception:  # noqa: BLE001 - 批量失败降级逐条重试
             return [self.extract(run) for run in runs]
+        # 抢救修复（v0.3）：与单条同口径——批量输出截断 → 本批卡/wiki 全部降级待审
+        truncated = (getattr(resp, "finish_reason", "") or "") == "length" or json_repaired
         out: list[ExtractionResult] = [ExtractionResult() for _ in runs]
         if isinstance(results, list):
             for entry in results:
@@ -352,20 +459,25 @@ class LLMExtractor:
                 if 0 <= idx < len(runs):
                     out[idx] = ExtractionResult(
                         cards=(
-                            self._cards_from_raw(runs[idx], raw_cards)
+                            self._cards_from_raw(runs[idx], raw_cards, truncated=truncated)
                             if isinstance(raw_cards, list) else []
                         ),
                         wiki_entries=(
-                            self._wiki_from_raw(runs[idx], raw_wiki)
+                            self._wiki_from_raw(runs[idx], raw_wiki, truncated=truncated)
                             if isinstance(raw_wiki, list) else []
                         ),
                     )
         return out
 
     def _cards_from_raw(
-        self, run: MemoryRun, raw_cards: list
+        self, run: MemoryRun, raw_cards: list, *, truncated: bool = False
     ) -> list[tuple[MemoryCard, str]]:
-        """raw cards -> MemoryCard（单条与批量共用；含证据枚举/回退映射）。"""
+        """raw cards -> MemoryCard（单条与批量共用；含证据枚举/回退映射）。
+
+        truncated（抢救修复 v0.3）：输出被截断时强制 evidence=uncertain——
+        auto_commit(uncertain)=False → 卡一律 lesson_pending（待审），
+        残缺内容不自动固化（此前截断修复成功会掩盖内容残缺直接入 event）。
+        """
         cards: list[tuple[MemoryCard, str]] = []
         for seq, raw in enumerate(raw_cards, start=1):
             if not isinstance(raw, dict):
@@ -386,6 +498,8 @@ class LLMExtractor:
                     else "inferred" if _legacy_conf >= 0.5
                     else "uncertain"
                 )
+            if truncated:
+                evidence = "uncertain"  # 截断降级：待审，不自动固化
             confidence = base_score(evidence)
             kind = "event" if auto_commit(evidence) else "lesson_pending"
             prefix = "evt" if kind == "event" else "les"
@@ -430,11 +544,15 @@ class LLMExtractor:
             )
         return cards
 
-    def _wiki_from_raw(self, run: MemoryRun, raw_wiki: list) -> list[WikiEntry]:
+    def _wiki_from_raw(
+        self, run: MemoryRun, raw_wiki: list, *, truncated: bool = False
+    ) -> list[WikiEntry]:
         """raw wiki -> WikiEntry（分流知识库；单条与批量共用，与 _cards_from_raw 同构）。
 
         证据门与卡一致：explicit/directive → active（直通检索）；
         inferred/uncertain → pending（待审，不进检索；promote_entry 提升）。
+        truncated（抢救修复 v0.3）：输出被截断时强制 evidence=uncertain →
+        一律 pending（残缺知识不得直通检索）。
         """
         entries: list[WikiEntry] = []
         for raw in raw_wiki:
@@ -450,6 +568,8 @@ class LLMExtractor:
             evidence = str(raw.get("evidence", "")).strip().lower()
             if evidence not in ("directive", "explicit", "inferred", "uncertain"):
                 evidence = "explicit"  # 缺省直通：模型没给证据时按可信处理
+            if truncated:
+                evidence = "uncertain"  # 截断降级：待审，不直通检索
             source_part = str(raw.get("source_part", "assistant")).strip() or "assistant"
             status = "active" if auto_commit(evidence, source_part=source_part) else "pending"
             entry_id = wiki_id(title, kind)

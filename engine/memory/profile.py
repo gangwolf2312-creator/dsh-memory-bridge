@@ -3,6 +3,7 @@
 存储（memory root 内，明文事实来源）：
   profiles/PROFILE.md            已审批主画像（F 桶每轮注入）
   profiles/drafts/*.md           蒸馏草稿（待人工审批）
+  profiles/approved/*.md         已采纳草稿（明文保留可找回，不再出现在待审列表）
   profiles/rejected/*.md         驳回草稿（明文保留可找回）
 消费：approved 摘要 <=200 tok 进 F 桶（assemble_context profile_provider）；
 人格多边形 8 轴 0-1 分数（MBTI 四维 + 4 行为轴），雷达渲染，F 桶只注入紧凑文本行。
@@ -19,6 +20,7 @@ PROFILE_DIR = "profiles"
 PROFILE_FILE = "PROFILE.md"
 DRAFT_DIR = "drafts"
 DRAFT_PREFIX = "PROFILE.draft-"
+APPROVED_DIR = "approved"
 REJECTED_DIR = "rejected"
 
 # 画像摘要进 F 桶的预算上限（ADR-0020：<=200 tok，token 契约测试锁定）
@@ -243,7 +245,10 @@ class ProfileStore:
         return parse_profile(path.read_text(encoding="utf-8"))
 
     def approve(self, draft_id: str) -> Profile:
-        """审批：草稿 -> PROFILE.md（status=approved，version+1）；草稿保留可找回。"""
+        """审批：草稿 -> PROFILE.md（status=approved，version+1）；草稿移入 approved/ 可找回。
+
+        草稿不再留在 drafts/，避免反复采纳同一草稿。
+        """
         draft = self.read_draft(draft_id)
         if draft is None:
             raise KeyError(f"画像草稿不存在: {draft_id}")
@@ -251,6 +256,12 @@ class ProfileStore:
         approved = self.load()
         if approved is None:  # 理论不可达（刚写入）
             raise KeyError(f"画像审批后读取失败: {draft_id}")
+        # 采纳后移出待审列表（明文保留，可找回）
+        src = self.draft_dir / draft_id
+        if src.is_file():
+            approved_dir = self.dir / APPROVED_DIR
+            approved_dir.mkdir(parents=True, exist_ok=True)
+            src.replace(approved_dir / draft_id)
         return approved
 
     def reject(self, draft_id: str) -> Path:
