@@ -594,7 +594,7 @@ function ConfigForm(props) {
 			h("div", { className: "dmb-grid", style: { gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" } },
 				h("div", { className: "dmb-field" }, h("label", null, "预设"), h("select", { value: local.preset, onChange: function (e) { set("local.preset", e.target.value); } }, h("option", { value: "qwen3-it-4b-flm" }, "qwen3-it-4b-flm（推荐）"), h("option", { value: "custom" }, "自定义（OpenAI 兼容端点）"))),
 				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "Base URL"), h("input", { value: local.baseUrl, placeholder: "http://127.0.0.1:11434/v1", onChange: function (e) { set("local.baseUrl", e.target.value); } })) : null,
-				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: local.model, placeholder: "qwen2.5:7b", onChange: function (e) { set("local.model", e.target.value); } })) : null,
+				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: local.model, placeholder: "qwen2.5:7b", onChange: function (e) { set("local.model", e.target.value); } }), h("div", { className: "dmb-hint" }, "建议选非思考模型（thinking 会污染提取质量）")) : null,
 				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } })) : null,
 				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "API Key 环境变量名"), h("input", { value: local.apiKeyEnv, placeholder: "留空则用上面的明文", onChange: function (e) { set("local.apiKeyEnv", e.target.value); } })) : null,
 				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.autoManage, onChange: function (e) { set("local.autoManage", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "自动健康检查 + 拉起本地推理服务" + (local.preset === "custom" ? "（自定义端点不自动拉起）" : "")))),
@@ -606,7 +606,7 @@ function ConfigForm(props) {
 			h("div", { className: "dmb-section-title" }, "云端轨"),
 			h("div", { className: "dmb-grid", style: { gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" } },
 				h("div", { className: "dmb-field" }, h("label", null, "Base URL"), h("input", { value: cloud.baseUrl, placeholder: "https://api.deepseek.com/v1", onChange: function (e) { set("cloud.baseUrl", e.target.value); } })),
-				h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: cloud.model, placeholder: "deepseek-chat", onChange: function (e) { set("cloud.model", e.target.value); } })),
+				h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: cloud.model, placeholder: "deepseek-chat", onChange: function (e) { set("cloud.model", e.target.value); } }), h("div", { className: "dmb-hint" }, "建议选非思考模型（如 deepseek-chat，勿用 deepseek-reasoner）")),
 				h("div", { className: "dmb-field" }, h("label", null, "API Key（脱敏显示）"), h("input", { value: cloud.apiKey, type: "password", placeholder: "sk-…", onChange: function (e) { set("cloud.apiKey", e.target.value); } })),
 				h("div", { className: "dmb-field" }, h("label", null, "批大小"), h("input", { value: cloud.batchSize, type: "number", min: 1, max: 32, onChange: function (e) { set("cloud.batchSize", Number(e.target.value)); } }))
 			),

@@ -42,9 +42,9 @@ dsh plugin --profile web remove dsh-memory-bridge
 
 | 项 | 说明 |
 |---|---|
-| 模式 mode | `off` 关闭 / `local` 本地 lemonade / `cloud` 云端记忆 API / `main` 主对话模型兜底 / `hybrid` 本地优先+云端兜底 |
+| 模式 mode | `off` 关闭 / `local` 本地模型 / `cloud` 云端记忆 API / `main` 主对话模型兜底 / `hybrid` 本地优先+云端兜底 |
 | local.preset | 本地模型预设（默认 `qwen3-it-4b-flm`），或 `custom` 自填 baseUrl/model/apiKey |
-| local.autoManage | 仅默认预设轨生效：开启后 health check 自动拉起 lemonade 并加载对应模型；`preset=custom` 时由你自填的 baseUrl/model 决定（不碰 lemonade） |
+| local.autoManage | 仅默认预设轨生效：开启后 health check 自动拉起本地推理服务并加载对应模型；`preset=custom` 时由你自填的 baseUrl/model 决定（不碰 lemonade） |
 | cloud.* | 云端记忆 API（baseUrl / model / apiKey / apiKeyEnv / batchSize / maxCallsPerMinute） |
 | sanitize | 提取前脱敏（手机号/邮箱/身份证/密钥），云端默认开启 |
 
@@ -52,6 +52,15 @@ dsh plugin --profile web remove dsh-memory-bridge
 - API key 在配置回读时一律脱敏显示（`masked_config`）。
 - 配置先校验后落盘（`configSet` 校验失败不写入），写入持单锁，无死锁。
 - 仓库只提供 `config.example.json` 模板（无密钥）；首次运行无 `config.json` 时自动使用内置默认配置。
+
+### 模型选择建议（重要）
+
+记忆提取/注入用**小参数量的非思考（non-thinking）模型**质量最稳，原因：
+
+- **思考 token 会污染提取结果**：reasoning 模型（如 deepseek-reasoner、开启 thinking 的 qwen3）输出含推理链，提取器按 JSON 结构解析时容易把思考内容当正文，导致标题/摘要漂移、归链错乱。
+- **默认预设已关闭思考**：`qwen3-it-4b-flm` 预设内置 `enable_thinking: False`（qwen3 专用参数，见 `memory/backends.py` 的 LOCAL_PRESETS），无需手动处理。
+- **custom 预设请选非思考变体**：例如 Ollama 的 `qwen2.5:7b`（无思考模式）、LMDeploy/vLLM 部署的 `qwen2.5-7b-instruct`（instruct 版，非 think 版）。若你的端点模型默认开思考，请在模型名/服务端配置关闭（`extra_body` 支持透传模型特有参数，如 `chat_template_kwargs.enable_thinking`，但不同模型参数名不同，请按服务端文档配置）。
+- **云端**：默认 `deepseek-chat` 即为非思考对话模型，不要换成 `deepseek-reasoner`；其他 OpenAI 兼容服务同理选非 reasoning 端点。
 
 ## UI（设置页 → 记忆）
 
