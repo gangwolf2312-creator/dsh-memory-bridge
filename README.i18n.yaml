@@ -1,6 +1,7 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   git hash-object README.md / README.zh-CN.md
-README.md: aa0982ff59bb2d45a08cc2a2a1bb596d5588e5c9
-README.zh-CN.md: e305a73f87517dc6b3d0a4f736e49c6bc3202de0
+#   git hash-object README.md / README.en.md
+# Chinese is the default display language (GitHub renders README.md on the repo home).
+README.md: c8723c3ab5fcaf4f44fe9db1a35d54f0f1c5bed7
+README.en.md: f34e828cb8db525c349ed14108d0e529a11d793f
