@@ -1,0 +1,24 @@
+{
+  "mode": "cloud",
+  "local": {
+    "preset": "qwen3-it-4b-flm",
+    "autoManage": true,
+    "baseUrl": "",
+    "model": "",
+    "apiKey": "",
+    "apiKeyEnv": "",
+    "sanitize": true
+  },
+  "cloud": {
+    "baseUrl": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "apiKey": "",
+    "apiKeyEnv": "",
+    "sanitize": true,
+    "batchSize": 8,
+    "maxCallsPerMinute": 10
+  },
+  "main": {
+    "sanitize": true
+  }
+}

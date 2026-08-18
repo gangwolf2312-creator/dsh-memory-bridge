@@ -1,0 +1,4 @@
+# Memory Tree System 依赖清单
+# 安装：install-deps.ps1（统一走国内镜像源）
+jieba>=0.42
+pytest>=8.0

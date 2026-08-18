@@ -9,25 +9,25 @@ DeepSeek Harness (host 插件进程)
 ├── lib/index.js          host 入口：拉起 sidecar、注册 /dsh-memory/* 路由、注册 3 个 agent 工具、
 │                         自动提取钩子（turn/end）、自动注入钩子（user/message → system prompt context）
 ├── python/memory_bridge_server.py   sidecar：JSON-RPC over HTTP，承载记忆树引擎 + 衰减治理 + lemonade
+├── engine/               记忆树引擎源码（core/ + memory/，依赖声明式安装，见下）
 └── client/client.js      设置页 UI（6 个 tab：总览 / 事件图谱 / 知识图谱 / 时间线 / 待审 / 审计）
 ```
 
-- **记忆引擎**：复用 `D:\dsh\plugins\Memory Tree System`（明文 markdown 真源 + SQLite 检索索引 + BM25/RRF 确定性检索，零外部服务依赖）。
+- **记忆引擎**：随插件携带 `engine/`（明文 markdown 真源 + SQLite 检索索引 + BM25/RRF 确定性检索，零外部服务依赖）。
 - **Sidecar 生命周期**：由 host 随插件启停自动托管；首次调用时按配置拉起本地 lemonade 并加载记忆专用模型。
-
-## 自动记忆流水线（写入端 + 读取端）
-
-| 环节 | 触发 | 行为 |
-|---|---|---|
-| **提取** | 每轮对话 `turn/end` | 增量扫描本轮 user+assistant 文本 → 入 run 队列 → 云端/本地提取 → 事件卡/经验/知识分流落库（含门卫、归链、冲突裁决、失败退避） |
-| **注入** | 每条 `user/message` | 检索相关记忆（L2 ≤3 条 / L1 ≤1 条 / 寒暄 L0 不注入，档位自动判定，50ms 超时宁缺勿滥）→ 缓存 → system prompt 渲染时以带溯源文本注入上下文（`[长期记忆 · 来源 …]`） |
-| **审计闭环** | `turn/end` 后 | 判定注入记忆是否被模型回复利用（`inject_used`）→ 命中滚动/未命中降权淡出 |
-| **衰减治理** | 启动对账 + 每次提取后 + 手动 | 30 天闲置枝完结枯萎（排除检索、数据保留）；全局利用率低自动收缩注入条数；低使用率卡降权 |
+- **引擎路径解析**（无需硬编码）：自动探测 `engine/`（本包内）→ 或同级 `Memory Tree System/`（开发布局）→ 或 `DSH_MEMORY_BRIDGE_ENGINE_ROOT` 环境变量 / 插件配置 `engineRoot`。
 
 ## 安装（官方路径）
 
+要求：DSH 0.1.0-rc.7+、Python 3.10+（本插件无 Node 原生依赖）。
+
 ```bat
-dsh plugin --profile web add link:D:/dsh/plugins/dsh-memory-bridge
+:: 1) 从 GitHub 安装（替换 <owner> 为仓库所属用户）
+dsh plugin --profile web add github:<owner>/dsh-memory-bridge
+
+:: 2) 安装 Python 依赖（jieba 分词，声明式；清华镜像，失败自动回退阿里云）
+pwsh <你的插件目录>/engine/install-deps.ps1
+:: 等价于：pip install -r <插件目录>/engine/requirements.txt
 ```
 
 重启 harness 后生效。卸载：
@@ -35,6 +35,8 @@ dsh plugin --profile web add link:D:/dsh/plugins/dsh-memory-bridge
 ```bat
 dsh plugin --profile web remove dsh-memory-bridge
 ```
+
+> **依赖策略**：Python 依赖（jieba）走声明式安装，不随仓库内嵌、也不在安装时静默 pip install（安全 + 可控）。sidecar 对缺失依赖有容错：返回可操作的安装指引（`pip install -r engine/requirements.txt`），不会拖垮整个 harness。
 
 ## 配置（设置页 → 插件 tab）
 
@@ -49,6 +51,7 @@ dsh plugin --profile web remove dsh-memory-bridge
 - **API key 支持 `apiKeyEnv`**：配置 `apiKeyEnv` 指定环境变量名后，优先读环境变量，回退明文 `apiKey`（渐进迁移：设了环境变量即可删除明文 key）。
 - API key 在配置回读时一律脱敏显示（`masked_config`）。
 - 配置先校验后落盘（`configSet` 校验失败不写入），写入持单锁，无死锁。
+- 仓库只提供 `config.example.json` 模板（无密钥）；首次运行无 `config.json` 时自动使用内置默认配置。
 
 ## UI（设置页 → 记忆）
 
@@ -83,8 +86,8 @@ dsh plugin --profile web remove dsh-memory-bridge
 ## 开发与测试
 
 ```bat
-REM 独立启动 sidecar（脱离 harness 联调）
-D:\Python312\python.exe -u D:\dsh\plugins\dsh-memory-bridge\python\memory_bridge_server.py --root "D:\dsh\plugins\Memory Tree System" --config D:\dsh\plugins\dsh-memory-bridge\config.json
+REM 独立启动 sidecar（脱离 harness 联调；--root 指向引擎目录）
+python -u <插件目录>\python\memory_bridge_server.py --root <引擎目录> --config <插件目录>\config.example.json
 ```
 
 启动后读 stdout 的 `DMB_PORT <port>`，然后：
@@ -93,10 +96,16 @@ D:\Python312\python.exe -u D:\dsh\plugins\dsh-memory-bridge\python\memory_bridge
 Invoke-RestMethod "http://127.0.0.1:<port>/rpc" -Method Post -Body @{method="overview";params=@{}} | ConvertTo-Json
 ```
 
-记忆引擎测试（独立于 harness）：
+一键冒烟测试（双场景：bundled engine 缺 jieba → 验证可操作指引；本地引擎 → 全功能）：
 
 ```bat
-D:\Python312\python.exe -m pytest "D:\dsh\plugins\Memory Tree System\tests" -q
+python smoke_sidecar.py
 ```
 
-启动器 `D:\dsh\DSH.bat`（纯 ASCII，任何终端无乱码）：单窗口后台启动 / 停止 / 状态 / 重启（含端口释放等待与启动检测）。
+记忆引擎测试（独立于 harness，需要 `pip install pytest`）：
+
+```bat
+python -m pytest <引擎目录>\tests -q
+```
+
+启动器 `D:\dsh\DSH.bat`（纯 ASCII，任何终端无乱码）：单窗口后台启动 / 停止 / 状态 / 重启（含端口释放等待、日志轮转、启动检测）。

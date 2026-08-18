@@ -1,0 +1,7 @@
+# npm publish ignores (npm pack uses .npmignore, not .gitignore)
+__pycache__/
+*.pyc
+*.log
+config.json
+config.local.json
+memory-hook.log

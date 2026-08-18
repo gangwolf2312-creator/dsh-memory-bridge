@@ -37,7 +37,15 @@ def _prepend_engine_root() -> None:
 
 _prepend_engine_root()
 
-from memory.store import now_iso  # noqa: F401  (rpc_add_run 时间戳)
+# 顶层 import 容错：jieba/引擎依赖缺失时不至于整个 sidecar 崩溃退出，
+# 而是记录错误，让 HTTP 服务器照常监听，所有 RPC 经 ensure_engine 返回
+# 可操作的安装指引（而非裸 ModuleNotFoundError / 进程直接退出）。
+_import_error: str | None = None
+try:
+    from memory.store import now_iso  # noqa: F401  (rpc_add_run 时间戳)
+except ModuleNotFoundError as exc:  # noqa: PERF203
+    _import_error = str(exc)
+    now_iso = None  # type: ignore[assignment]
 
 BANNER = "DMB_PORT"
 
@@ -142,7 +150,24 @@ def ensure_engine() -> dict[str, Any]:
         root = Path(_engine_root or ".").resolve()
         if str(root) not in sys.path:
             sys.path.insert(0, str(root))
-        import jieba  # noqa: F401  (bundled pure-python package)
+        if _import_error is not None:
+            # 顶层 import 已失败（如 jieba 缺失）：给出可操作指引，不重复裸异常
+            raise RuntimeError(
+                "Memory Tree engine dependency missing: "
+                f"{_import_error}. Install once, e.g.: "
+                f"pip install -r {root / 'requirements.txt'} "
+                "(or run: pwsh <engine>/install-deps.ps1). The sidecar needs "
+                "jieba for tokenization before any memory operation."
+            )
+        try:
+            import jieba  # noqa: F401  (bundled pure-python package)
+        except ModuleNotFoundError:
+            raise RuntimeError(
+                "Memory Tree engine dependency missing: jieba. "
+                f"Install it once, e.g.: pip install -r {root / 'requirements.txt'} "
+                "(or run: pwsh <engine>/install-deps.ps1). The sidecar needs jieba "
+                "for tokenization before any memory operation."
+            ) from None
         import memory as mem
         from memory.audit import audit_summary
         from memory.decay import DecayMaintenance

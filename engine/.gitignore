@@ -1,0 +1,20 @@
+# —— Python 产物 ——
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# —— 运行时数据目录（明文可重建，索引可重建，不进库）——
+memory-tree/
+memory-wiki/
+.index/
+.tmp-*/
+.tmp*
+
+# —— 第三方 vendored（requirements.txt 声明，pip 可装）——
+jieba/
+jieba.cache
+
+# —— 系统/编辑器 ——
+.DS_Store
+Thumbs.db
+.obsidian/
