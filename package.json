@@ -1,7 +1,7 @@
 {
   "name": "dsh-memory-bridge",
   "description": "Memory Tree bridge for DeepSeek Harness — search/persist memory, manage the memory tree, and drive the local/cloud extraction backends. · 记忆树桥接：检索/落盘记忆、管理记忆树、本地/云端提取开关。",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "main": "lib/index.js",
   "license": "MIT",

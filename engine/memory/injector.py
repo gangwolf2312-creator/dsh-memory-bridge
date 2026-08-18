@@ -47,23 +47,26 @@ _SINGLE_WORD_MAX_DF = 3
 _DF_CACHE: dict = {"at": 0.0, "df": None}
 
 
-def _query_core_words(query: str) -> set[str]:
-    """query 核心词：jieba 词性提取实词（数据驱动，无人工词表）。
+def _query_core_words(query: str) -> dict[str, str]:
+    """query 核心词（词 → 词性首字母）：jieba 词性提取实词（数据驱动，无人工词表）。
 
     保留：名词(n)/动词(v)/形容词(a)/方位(f)/时间(t)/习语(l/i)/简称(j)；
     过滤：代词(r)/助词(u)/连词(c)/副词(d)/介词(p)/数词(m)/量词(q)/标点(x)；
     英文词 ≥4 字符（ui/api/id 等泛缩写不计）；单字不计。
+    词性用于单词通道（v0.6：仅名词/形容词单重叠可注入——动词"迁移/解决"
+    语义绑定弱，实测"数据库迁移"因"迁移"单词误注入 apiKey 迁移卡）。
     """
-    out: set[str] = set()
+    out: dict[str, str] = {}
     for w, flag in posseg.cut(query or ""):
         if len(w) < 2:
             continue
         if w.isascii():
             if len(w) >= 4:
-                out.add(w.lower())
+                out.setdefault(w.lower(), "eng")
             continue
-        if flag[:1] in ("n", "v", "a", "f", "t", "l", "i", "j"):
-            out.add(w)
+        f0 = flag[:1]
+        if f0 in ("n", "v", "a", "f", "t", "l", "i", "j"):
+            out.setdefault(w, f0)
     return out
 
 
@@ -114,29 +117,87 @@ def _card_tokens(store, card_id: str) -> set[str]:
     return {w for w in tokenize_words(f"{card.title} {card.content}") if len(w) > 1}
 
 
+def _card_seq(store, card_id: str) -> list[str]:
+    """卡的有序词级 token 序列（短语匹配用；tokens 列保序）。"""
+    try:
+        toks = store.card_tokens(card_id)
+        if toks:
+            return [w for w in toks if len(w) > 1]
+    except Exception:
+        pass
+    card = store.read_card(card_id)
+    if card is None:
+        return []
+    return [w for w in tokenize_words(f"{card.title} {card.content}") if len(w) > 1]
+
+
+def _phrase_hit(query_core: dict[str, str], seq: list[str]) -> bool:
+    """短语通道（v0.6）：query 中相邻的核心词对在卡序列中也相邻出现。
+
+    数据驱动依据：项目专名（记忆/插件）在单项目库里 df 极高，Σ idf 多词
+    通道会误拦"记忆插件"这类精确主题短语；而"问题/解决"这类泛词在 query
+    与卡中均不相邻（"问题没解决"vs"不解决…的问题"）→ 不触发。短语相邻
+    是精确的主题信号。
+    """
+    core_words = list(query_core.keys())
+    if len(core_words) < 2:
+        return False
+    pairs = set(zip(core_words, core_words[1:]))
+    if not pairs:
+        return False
+    for i in range(len(seq) - 1):
+        if (seq[i], seq[i + 1]) in pairs:
+            return True
+    return False
+
+
+# 事件卡相关度门槛（v0.6 校准，2026-08-19，N=185）：
+# - 单词重叠：idf ≥ 4.2（≈ df ≤ 2）——单稀有词强信号（数据库/边栏/聚团）；
+#   "解决"(df3/idf3.97) 等次稀有动词不过
+# - 多词重叠：Σ idf ≥ 6.0——v0.5 只数词数、无 idf 下限，实测排障 query
+#   "问题(df30/idf1.81)+解决(df3/idf3.97)=5.78" 误注入无关卡；相关案例
+#   "显示+模块+切换=7.97" 过；"图谱+聚团+修复"≈8+ 过；"记忆+插件+注入+
+#   机制"≈7.7 过（4 词低频和够）；"注入+机制=4.64" 拦（宁缺勿滥）
+_MULTI_WORD_MIN_SCORE = 6.0
+_SINGLE_WORD_MIN_IDF = 4.2
+
+
 def _event_gate(
-    query_core: set[str],
+    query_core: dict[str, str],
     card_tokens: set[str],
+    card_seq: list[str],
+    chain_title: str,
     df: Counter,
     n_docs: int,
 ) -> float:
-    """事件卡注入门槛（v0.5）：多核心词重叠 或 单稀有词重叠。
+    """事件卡注入门槛（v0.6）：idf 加权 + 词性 + 短语三通道。
 
-    返回加权分（>0 才注入）：多词 = 重叠词 idf 之和；单词 = 该词 idf（仅当
-    df ≤ _SINGLE_WORD_MAX_DF 的稀有词）。实测依据：单"采用/逻辑/整体"等
-    中等频率词重叠不足以证明相关（语境界别），单"数据库/边栏"等稀有词
-    重叠是强信号。
+    返回加权分（>0 才注入）：
+    - 多词（≥2 重叠核心词）：Σ idf ≥ _MULTI_WORD_MIN_SCORE
+    - 单词：名词/形容词且 idf ≥ _SINGLE_WORD_MIN_IDF（稀有词强信号；
+      动词单重叠语义绑定弱——实测"数据库迁移"因"迁移"单词误注入 apiKey 卡）
+    - 短语：query 相邻核心词对在卡序列或链标题中相邻出现 → 直接放行
+      （精确主题信号，救"记忆插件"类高频项目专名）
+    实测依据（N=185）：排障 query"问题+解决=5.78"误注入无关卡（v0.5 多词
+    通道无下限）；相关"显示+模块+切换=7.97"、"图谱+聚团+修复≈8+" 过。
     """
     overlap = [w for w in query_core if w in card_tokens]
     if not overlap:
         return 0.0
+    score = sum(_idf(n_docs, df.get(w, 0)) for w in overlap)
     if len(overlap) >= 2:
-        return sum(_idf(n_docs, df.get(w, 0)) for w in overlap)
-    w = overlap[0]
-    d = df.get(w, 0)
-    if d > _SINGLE_WORD_MAX_DF:
-        return 0.0
-    return _idf(n_docs, d)
+        if score >= _MULTI_WORD_MIN_SCORE:
+            return score
+        # 多词未达分 → 仍可走短语通道
+    else:
+        w = overlap[0]
+        if query_core.get(w, "") in ("n", "a") and score >= _SINGLE_WORD_MIN_IDF:
+            return score
+    if _phrase_hit(query_core, card_seq):
+        return max(score, 0.01)
+    if chain_title and _phrase_hit(query_core, [w for w in tokenize_words(chain_title) if len(w) > 1]):
+        return max(score, 0.01)
+    return 0.0
 
 
 class MemoryInjector:
@@ -188,7 +249,8 @@ class MemoryInjector:
             return []  # A6：超时 → 空注入（宁缺勿滥）
         # v0.5 根本修复：数据驱动分级门槛（废除人工词表）——
         #   1) query 核心词 = jieba 词性提取的实词
-        #   2) 事件卡（search 结果）：≥2 核心词重叠 或 单稀有词（df≤3）
+        #   2) 事件卡（search 结果）：Σ idf 多词门槛 / 名词形容词稀有词 /
+        #      相邻短语通道（v0.6）
         #   3) 事实卡（lesson/pending/偏好）：≥1 核心词重叠即注入
         # search 的排序（RRF 多列）只用于候选召回，注入排序按本评分。
         q_core = _query_core_words(query)
@@ -200,7 +262,8 @@ class MemoryInjector:
             toks = _card_tokens(self.search.store, r.card_id)
             if not toks:
                 continue
-            score = _event_gate(q_core, toks, df, n_docs)
+            seq = _card_seq(self.search.store, r.card_id)
+            score = _event_gate(q_core, toks, seq, r.chain_title or "", df, n_docs)
             if score > 0:
                 gated.append((score, r))
         gated.sort(key=lambda item: item[0], reverse=True)
@@ -235,7 +298,7 @@ class MemoryInjector:
         return results
 
     def _fact_lookup(
-        self, query: str, limit: int, *, q_core: set[str] | None = None
+        self, query: str, limit: int, *, q_core: dict[str, str] | None = None
     ) -> list[SearchResult]:
         """事实卡补充检索：active 的 lesson_permanent/pending 卡直查 + 核心词重叠。
 
@@ -265,7 +328,7 @@ class MemoryInjector:
             if getattr(c, "invalid_at", None):
                 continue
             toks = _card_tokens(self.search.store, c.id)
-            overlap = len(q_core & toks)
+            overlap = len(set(q_core) & toks)
             if overlap <= 0:
                 continue
             scored.append(
