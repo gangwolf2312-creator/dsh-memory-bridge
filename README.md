@@ -198,6 +198,8 @@ pwsh <你的插件目录>/engine/install-deps.ps1
 
 重启 harness 后生效。卸载：`dsh plugin --profile web remove dsh-memory-bridge`
 
+> 已带 `dsh-plugin` / `dsh-category-memory` topics——可从 **DSH 设置 → 插件市场（Marketplace）** 的 memory 分类下发现并一键安装。
+
 > 依赖策略：jieba 走声明式安装，不内嵌、不在安装时静默 pip install；缺失时 sidecar 返回可操作指引，不拖垮 harness。
 
 ---
