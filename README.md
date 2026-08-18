@@ -14,8 +14,8 @@ DeepSeek Harness (host 插件进程)
 ```
 
 - **记忆引擎**：随插件携带 `engine/`（明文 markdown 真源 + SQLite 检索索引 + BM25/RRF 确定性检索，零外部服务依赖）。
-- **Sidecar 生命周期**：由 host 随插件启停自动托管；首次调用时按配置拉起本地 lemonade 并加载记忆专用模型。
-- **引擎路径解析**（无需硬编码）：自动探测 `engine/`（本包内）→ 或同级 `Memory Tree System/`（开发布局）→ 或 `DSH_MEMORY_BRIDGE_ENGINE_ROOT` 环境变量 / 插件配置 `engineRoot`。
+- **Sidecar 生命周期**：由 host 随插件启停自动托管。**lemonade 仅在 `local`/`hybrid` 模式的默认预设轨被拉起**（可选本地推理后端）；`cloud` / `main` / `local`+`preset=custom` 模式完全不依赖 lemonade——没有 lemonade 的用户选 `cloud`（云端提取）或 `custom`（任意 OpenAI 兼容本地端点，如 Ollama/LMDeploy）即可。
+- **引擎路径解析**（无需硬编码，优先级从高到低）：`DSH_MEMORY_BRIDGE_ENGINE_ROOT` 环境变量 → 插件配置 `engineRoot` → 自动探测 `engine/`（本包内）→ 同级 `Memory Tree System/`（开发布局）。Python 可执行文件同理：`DSH_MEMORY_BRIDGE_PYTHON` → 配置 `pythonExe` → `python`（PATH）。
 
 ## 安装（官方路径）
 
@@ -44,7 +44,7 @@ dsh plugin --profile web remove dsh-memory-bridge
 |---|---|
 | 模式 mode | `off` 关闭 / `local` 本地 lemonade / `cloud` 云端记忆 API / `main` 主对话模型兜底 / `hybrid` 本地优先+云端兜底 |
 | local.preset | 本地模型预设（默认 `qwen3-it-4b-flm`），或 `custom` 自填 baseUrl/model/apiKey |
-| local.autoManage | 开启后：health check 自动拉起 lemonade 并加载对应模型 |
+| local.autoManage | 仅默认预设轨生效：开启后 health check 自动拉起 lemonade 并加载对应模型；`preset=custom` 时由你自填的 baseUrl/model 决定（不碰 lemonade） |
 | cloud.* | 云端记忆 API（baseUrl / model / apiKey / apiKeyEnv / batchSize / maxCallsPerMinute） |
 | sanitize | 提取前脱敏（手机号/邮箱/身份证/密钥），云端默认开启 |
 
@@ -60,7 +60,7 @@ dsh plugin --profile web remove dsh-memory-bridge
 | 总览 | 统计 / 状态 / 审计摘要 / 最近活动 |
 | 事件图谱 | 力导向图 + 记忆树导航联动（点树聚焦图、点图按图过滤树）、孤立节点/实体关联开关、方向箭头流动线 |
 | 知识图谱 | wiki 条目力导向图（上位/版本关系）+ 搜索 + 条目列表 |
-| 时间线 | 事件流按日期分组（今天/昨天/N 天前），时间倒序 |
+| 时间线 | 事件流按日期分组（今天 / 昨天 / 2-6 天前，更早归入"更早"），时间倒序 |
 | 待审 | 提取队列 / pending 经验审批 |
 | 审计 | 注入/提取统计 + 「立即维护」按钮（手动衰减+治理）+ 决策日志 |
 
@@ -74,14 +74,15 @@ dsh plugin --profile web remove dsh-memory-bridge
 
 ## HTTP API（浏览器代理，host 转发到 sidecar）
 
-- `GET  /dsh-memory/overview` `health` `search?q=` `browse?kind=` `card?id=` `review?runId=` `wiki?q=` `config` `lemonade-status` `audit` `graph`
-- `POST /dsh-memory/card-action` `add-run` `config` `lemonade-ensure` `extract` `inject` `recordUsage` `maintenance`
+- `GET  /dsh-memory/overview` `health` `search?q=` `browse?kind=` `card?id=` `review?runId=` `wiki?q=` `config` `lemonade-status` `audit` `graph`（只读，需带 `x-dsh-memory: 1` header 或同源 Origin，见安全）
+- `POST /dsh-memory/card-action` `add-run` `config` `lemonade-ensure` `extract` `maintenance`（写操作，同源校验）
+- `inject` / `recordUsage` 不暴露为 HTTP 路由：宿主插件在事件钩子（user/message 预取、turn/end 审计）内部直连 sidecar 调用，浏览器不可直接触发。
 
 ## 安全
 
-- **同源校验**：POST（写操作）严格校验 Origin（浏览器同源 POST 必带）；GET（只读）宽松校验——带 Origin 的必须匹配（防跨站读取），无 Origin 放行（同源 GET fetch 与地址栏访问正常）。
+- **同源校验**：POST（写操作）严格校验 Origin（浏览器同源 POST 必带，不匹配即 403）；GET（只读）——带 Origin 的必须匹配（防跨站读取），**无 Origin 时必须携带本地标记 header `x-dsh-memory: 1`**（跨站 `<img>`/`<script>` 无法自定义 header，从而挡掉只读检索附带的统计副作用）。UI 的 fetch 均带该 header。
 - 云端提取前默认脱敏；`apiKey` 永不回显明文，支持 `apiKeyEnv` 环境变量。
-- Sidecar 仅监听 127.0.0.1 随机端口，不暴露公网；RPC body 上限 1MB；hook 调试日志 1MB 轮转。
+- Sidecar 仅监听 127.0.0.1 随机端口，不暴露公网；RPC body 上限 1MB；hook 调试日志 1MB 轮转（异步低频检查，不阻塞会话热路径）。
 
 ## 开发与测试
 

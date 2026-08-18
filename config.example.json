@@ -1,18 +1,18 @@
 {
-  "mode": "cloud",
+  "mode": "local",
   "local": {
-    "preset": "qwen3-it-4b-flm",
-    "autoManage": true,
-    "baseUrl": "",
-    "model": "",
-    "apiKey": "",
-    "apiKeyEnv": "",
+    "preset": "custom",
+    "autoManage": false,
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "model": "qwen2.5:7b",
+    "apiKey": "plain-fallback",
+    "apiKeyEnv": "DMB_TEST_LOCAL_KEY",
     "sanitize": true
   },
   "cloud": {
     "baseUrl": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
-    "apiKey": "",
+    "apiKey": "sk-x",
     "apiKeyEnv": "",
     "sanitize": true,
     "batchSize": 8,

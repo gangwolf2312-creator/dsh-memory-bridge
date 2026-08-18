@@ -435,7 +435,7 @@ function MemoryPanel() {
 				h("div", { className: "dmb-subtitle" }, overview ? (overview.memoryRoot || "") : "加载中…")
 			),
 			h("div", { className: "dmb-pills" },
-				h("span", { className: "dmb-pill" }, h(Dot, { state: lemonade && lemonade.serverUp ? "ok" : "err" }), "Lemonade ", lemonade && lemonade.serverUp ? "在线" : "离线"),
+				mode === "local" || mode === "hybrid" ? h("span", { className: "dmb-pill" }, h(Dot, { state: lemonade && lemonade.serverUp ? "ok" : "err" }), "本地推理 ", lemonade && lemonade.serverUp ? "在线" : "离线") : null,
 				h("span", { className: "dmb-pill" }, "模式 ", h("b", null, mode)),
 				h("button", { className: "dmb-btn", onClick: refresh, title: "刷新" }, "↻")
 			)
@@ -498,7 +498,7 @@ function OverviewTab(props) {
 		),
 		h("div", { className: "dmb-grid", style: { gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" } },
 			h("div", { className: "dmb-card", style: { marginBottom: 0 } },
-				h("h3", null, h(Icon, { name: "server", size: 14 }), "本地推理 Lemonade"),
+				h("h3", null, h(Icon, { name: "server", size: 14 }), "本地推理服务"),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "服务状态")), h("div", null, h("span", { className: "dmb-pill" }, h(Dot, { state: lemonade.serverUp ? "ok" : "err" }), lemonade.serverUp ? "运行中" : "离线"))),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "目标模型加载")), h("div", { className: "v" }, lemonade.modelLoaded ? h("span", { className: "dmb-ic" }, h(Icon, { name: "check", size: 12 }), "已就绪") : "未加载")),
 				h("div", { className: "dmb-row" }, h("div", { className: "grow" }, h("div", { className: "k" }, "已加载模型")), h("div", { className: "v" }, (lemonade.loadedModels || []).join(", ") || "—")),
@@ -536,7 +536,7 @@ function LemonadeEnsure(props) {
 		}).catch(function (err) { toast.show("拉起失败：" + ((err && err.message) || err), "err"); }).finally(function () { setBusy(false); });
 	};
 	return h("span", null,
-		h("button", { className: "dmb-btn primary", onClick: run, disabled: busy }, busy ? "拉起中…" : h("span", { className: "dmb-ic" }, h(Icon, { name: "bolt", size: 13 }), "拉起模型")),
+		h("button", { className: "dmb-btn primary", onClick: run, disabled: busy }, busy ? "拉起中…" : h("span", { className: "dmb-ic" }, h(Icon, { name: "bolt", size: 13 }), "拉起本地推理")),
 		toast.node
 	);
 }
@@ -575,7 +575,7 @@ function ConfigForm(props) {
 
 	var modes = [
 		{ id: "off", label: "纯规则", desc: "零 LLM 调用" },
-		{ id: "local", label: "本地模型", desc: "Lemonade 自动拉起" },
+		{ id: "local", label: "本地模型", desc: "本地推理（预设或自定义端点）" },
 		{ id: "cloud", label: "云端专用", desc: "独立提取 API" },
 		{ id: "main", label: "主对话模型", desc: "复用会话模型" },
 		{ id: "hybrid", label: "混合", desc: "本地优先·云端兜底" }
@@ -592,13 +592,15 @@ function ConfigForm(props) {
 		form.mode === "local" || form.mode === "hybrid" ? h("div", null,
 			h("div", { className: "dmb-section-title" }, "本地轨"),
 			h("div", { className: "dmb-grid", style: { gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" } },
-				h("div", { className: "dmb-field" }, h("label", null, "预设"), h("select", { value: local.preset, onChange: function (e) { set("local.preset", e.target.value); } }, h("option", { value: "qwen3-it-4b-flm" }, "qwen3-it-4b-flm（推荐）"), h("option", { value: "custom" }, "自定义"))),
-				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "Base URL"), h("input", { value: local.baseUrl, placeholder: "http://127.0.0.1:xxxx/v1", onChange: function (e) { set("local.baseUrl", e.target.value); } })) : null,
-				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: local.model, placeholder: "model-name", onChange: function (e) { set("local.model", e.target.value); } })) : null,
-				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.autoManage, onChange: function (e) { set("local.autoManage", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "自动健康检查 + 拉起 Lemonade"))),
+				h("div", { className: "dmb-field" }, h("label", null, "预设"), h("select", { value: local.preset, onChange: function (e) { set("local.preset", e.target.value); } }, h("option", { value: "qwen3-it-4b-flm" }, "qwen3-it-4b-flm（推荐）"), h("option", { value: "custom" }, "自定义（OpenAI 兼容端点）"))),
+				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "Base URL"), h("input", { value: local.baseUrl, placeholder: "http://127.0.0.1:11434/v1", onChange: function (e) { set("local.baseUrl", e.target.value); } })) : null,
+				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "模型名"), h("input", { value: local.model, placeholder: "qwen2.5:7b", onChange: function (e) { set("local.model", e.target.value); } })) : null,
+				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } })) : null,
+				local.preset === "custom" ? h("div", { className: "dmb-field" }, h("label", null, "API Key 环境变量名"), h("input", { value: local.apiKeyEnv, placeholder: "留空则用上面的明文", onChange: function (e) { set("local.apiKeyEnv", e.target.value); } })) : null,
+				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.autoManage, onChange: function (e) { set("local.autoManage", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "自动健康检查 + 拉起本地推理服务" + (local.preset === "custom" ? "（自定义端点不自动拉起）" : "")))),
 				h("div", { className: "dmb-field" }, h("label", { className: "dmb-switch" }, h("input", { type: "checkbox", checked: !!local.sanitize, onChange: function (e) { set("local.sanitize", e.target.checked); } }), h("span", { className: "track" }), h("span", { className: "txt" }, "发送前脱敏")))
 			),
-			h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } }))
+			local.preset !== "custom" ? h("div", { className: "dmb-field" }, h("label", null, "API Key（本地一般免鉴权）"), h("input", { value: local.apiKey, type: "password", placeholder: "留空", onChange: function (e) { set("local.apiKey", e.target.value); } })) : null
 		) : null,
 		form.mode === "cloud" || form.mode === "hybrid" ? h("div", null,
 			h("div", { className: "dmb-section-title" }, "云端轨"),
