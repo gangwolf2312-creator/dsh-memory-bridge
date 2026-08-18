@@ -747,35 +747,90 @@ def rpc_extract(params: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "mode": mode, "extracted": total, "processed": total}
 
 
-def rpc_record_signals(params: dict[str, Any]) -> dict[str, Any]:
-    """规则台账（PreferenceLedger）：扫描一轮对话的偏好信号，聚合 ≥3 同类 → lesson_pending 提案。
+def rpc_recorder(params: dict[str, Any]) -> dict[str, Any]:
+    """零 LLM 即时记忆（rules.py 设计原意：用户消息到达即规则扫描，不依赖 LLM 提取）。
 
-    沉淀经验（lesson_permanent）通道：偏好信号 → 提案（pending）→ 人工采纳（promote_lesson）。
-    提取提示词会把偏好标 explicit 直接成 event 卡，此通道独立识别偏好，二者互补。
+    三条规则通道（全部只扫用户文本，零模型调用，不抢 TTFT）：
+    ① extract_direct_lesson  "记住教训/踩坑/经验教训" → 立即沉淀 lesson_permanent（永久经验卡）
+    ② extract_direct_memory  "记住/记下/别忘了" → 立即沉淀 event 卡
+    ③ extract_signal         "我喜欢/更喜欢/习惯/别用" → 偏好信号入账 → 聚合 ≥3 同类 → lesson_pending 提案
     """
-    eng = ensure_engine()
-    from memory.rules import PreferenceLedger
+    from memory.rules import (
+        PreferenceLedger,
+        extract_direct_lesson,
+        extract_direct_memory,
+    )
 
+    eng = ensure_engine()
+    store = eng["store"]
     user_text = str(params.get("userText", ""))
-    reply_text = str(params.get("replyText", ""))
+    if not user_text.strip():
+        return {"ok": True, "recorded": 0, "proposed": [], "cards": []}
+    import hashlib as _hashlib
+
+    def _now():
+        from memory.store import now_iso as _now_iso
+        return _now_iso()
+
     source = str(params.get("sourcePath", "")) or "runs/staged"
-    ledger = PreferenceLedger(eng["store"], source_path=source)
-    recorded = 0
-    for text in (user_text, reply_text):
-        if text.strip():
-            try:
-                sig = ledger.record(text)
-                if sig is not None:
-                    recorded += 1
-            except Exception:  # noqa: BLE001 - 单条信号失败不影响其余
-                continue
+    cards_created: list[dict] = []
+
+    # ① 教训指令 → 永久经验卡（最高优先级，先于"记住"检查——rules.py 注释）
+    lesson = extract_direct_lesson(user_text)
+    if lesson:
+        digest = _hashlib.sha1(f"lesn|{lesson}".encode()).hexdigest()[:12]
+        card_id = f"lesn-{digest}"
+        if store.read_card(card_id) is None:
+            from memory.models import MemoryCard
+            card = MemoryCard(
+                id=card_id,
+                kind="lesson_permanent",
+                title=f"经验：{lesson[:40]}",
+                content=lesson,
+                source_path=f"lessons/permanent/{card_id}.md",
+                created_at=_now(),
+                confidence=0.95,  # 用户明确指令表达，高置信直接固化
+                status="active",
+            )
+            store.write_card(card)
+            store.log_decision("lesson_direct", f"{card_id}: {lesson[:60]}")
+            cards_created.append({"cardId": card_id, "kind": "lesson_permanent", "title": card.title})
+        return {"ok": True, "recorded": 0, "proposed": [], "cards": cards_created}
+
+    # ② 直接记忆指令 → 事件卡（"记住：X"）
+    memo = extract_direct_memory(user_text)
+    if memo:
+        digest = _hashlib.sha1(f"mem|{memo}".encode()).hexdigest()[:12]
+        card_id = f"evt-{digest}"
+        if store.read_card(card_id) is None:
+            from memory.models import MemoryCard
+            card = MemoryCard(
+                id=card_id,
+                kind="event",
+                title=f"记住：{memo[:40]}",
+                content=memo,
+                source_path=f"events/cards/{card_id}.md",
+                created_at=_now(),
+                confidence=0.9,
+                status="active",
+            )
+            store.write_card(card)
+            store.log_decision("memory_direct", f"{card_id}: {memo[:60]}")
+            cards_created.append({"cardId": card_id, "kind": "event", "title": card.title})
+        return {"ok": True, "recorded": 0, "proposed": [], "cards": cards_created}
+
+    # ③ 偏好信号 → 入账 + 聚合提案（≥3 同类 → lesson_pending）
+    ledger = PreferenceLedger(store, source_path=source)
+    sig = ledger.record(user_text)
+    recorded = 1 if sig is not None else 0
     proposed = []
-    with contextlib.suppress(Exception):
-        for card in ledger.propose():
-            proposed.append({"cardId": card.id, "title": card.title})
-    if proposed:
-        eng["store"].log_decision("lesson_propose", f"{len(proposed)} 张偏好提案")
-    return {"ok": True, "recorded": recorded, "proposed": proposed}
+    if sig is not None:
+        with contextlib.suppress(Exception):
+            for card in ledger.propose():
+                proposed.append({"cardId": card.id, "title": card.title})
+        if proposed:
+            store.log_decision("lesson_propose", f"{len(proposed)} 张偏好提案")
+    return {"ok": True, "recorded": recorded, "proposed": proposed, "cards": cards_created}
 
 
 def rpc_audit(_params: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1105,7 +1160,7 @@ METHODS: dict[str, Any] = {
     "configGet": rpc_config_get,
     "configSet": rpc_config_set,
     "extract": rpc_extract,
-    "recordSignals": rpc_record_signals,
+    "recorder": rpc_recorder,
     "audit": rpc_audit,
     "graph": rpc_graph,
     "inject": rpc_inject,
