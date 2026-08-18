@@ -326,6 +326,11 @@ def rpc_overview(_params: dict[str, Any] | None = None) -> dict[str, Any]:
     by_status: dict[str, int] = {}
     for kind in ("event", "chain", "lesson_pending", "lesson_permanent", "profile"):
         counts[kind] = store.count_cards(kind=kind)
+    # 画像不在 cards 表（ProfileStore 管理 profiles/PROFILE.md）：真实状态覆盖计数
+    with contextlib.suppress(Exception):
+        profile = eng["profile_store"].load()
+        if profile is not None and profile.status == "approved":
+            counts["profile"] = 1
     for status in ("active", "archived"):
         by_status[status] = store.count_cards(status=status)
     wiki_counts: dict[str, int] = {}
@@ -334,6 +339,10 @@ def rpc_overview(_params: dict[str, Any] | None = None) -> dict[str, Any]:
             1 for e in eng["wiki_store"].all_entries() if e.kind == kind
         )
     lemonade = _lemonade_payload()
+    # 画像草稿数（badge 用）
+    profile_drafts = 0
+    with contextlib.suppress(Exception):
+        profile_drafts = len(eng["profile_store"].list_drafts())
     return {
         "memoryRoot": eng["memory_root"],
         "wikiRoot": eng["wiki_root"],
@@ -341,6 +350,7 @@ def rpc_overview(_params: dict[str, Any] | None = None) -> dict[str, Any]:
         "counts": counts,
         "byStatus": by_status,
         "pendingCount": counts.get("lesson_pending", 0),
+        "profileDrafts": profile_drafts,
         "wiki": wiki_counts,
         "runs": {"total": store.runs_count(), "staged": store.staged_backlog()},
         "lemonade": lemonade,
