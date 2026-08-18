@@ -29,7 +29,7 @@ DeepSeek Harness (host 插件进程)
 
 - **枝 = 事件链，叶 = 事件卡**。同一主题/任务/项目的事实由 LLM 标出 chain 标题，系统确定性归链（`resolve_chain`，跨会话同主题归同一枝）；事件卡经 `parent_id` 挂在链卡下，链卡用 `children` 记录子卡。枝完结时生成"果摘要"（`summary`）作为树导航路标。
 - **自带时序**：每张卡带 `created_at`（出生）、`updated_at`（演化）、`ended_at`（事件完结即萎缩）。版本演化用 `supersedes` / `superseded_by` 构成**时序版本链**——新事实覆盖旧事实时旧卡标注失效（`invalid_at`），**保留审计不删**。时间线 tab（今天/昨天/2-6 天前）就是时序的另一种视图。
-- **蒸馏路径**：事件卡（发生了什么）→ 归入事件链（主题演进）→ 经验沉淀（`lessons/pending` 待审 → 人工采纳 `lessons/permanent`）。**画像蒸馏（`distill.py` → `profiles/PROFILE.md`）已实现但尚未接线**——引擎侧 `ProfileDistiller` 类完整（收集事件树 → LLM → 草稿防抖去重），但 sidecar 桥接层暂无蒸馏触发入口，当前 overview 的 `profile` 计数恒为 0、profiles 目录为空（详见"已知限制"）。
+- **蒸馏路径**：事件卡（发生了什么）→ 归入事件链（主题演进）→ 经验沉淀（`lessons/pending` 待审 → 人工采纳 `lessons/permanent`）→ 画像（`profiles`，长期偏好）。画像蒸馏（`distill.py`）已接线：手动触发 → 产草稿 → 审批固化 → 进入注入常驻基线（详见"已知限制"）。
 - **溯源与证据**：每张卡带 `source_path`（哪个 md）、`trace_event_id`（哪个回合）、`evidence`（directive/explicit/inferred/uncertain 置信校准）、`corroborations`（佐证计数）——**每条记忆都可回到原始对话**。
 
 ### 模型输出只产生候选，真值由机制裁决
@@ -48,7 +48,7 @@ DeepSeek Harness (host 插件进程)
 
 ### 注入哲学（读取端克制，分三层）
 
-记忆是给模型"按需翻阅"的，不是无脑塞进每轮上下文。**当前实装的注入 = 拉式检索**（`MemoryInjector.inject_for_tier`，按对话意图分档，L2 ≤3 条 / L1 ≤1 条 / 寒暄 L0 零注入，50ms 超时宁缺勿滥）。设计文档中的"三层注入"（常驻基线 + 拉式检索 + 收尾写提示）是**目标形态，当前只实现了拉式层**——`build_static_snapshot`（常驻基线）尚未实现，画像未接线（详见"已知限制"）。
+记忆是给模型"按需翻阅"的，不是无脑塞进每轮上下文。当前注入 = **拉式检索**（`MemoryInjector.inject_for_tier`，按对话意图分档，L2 ≤3 条 / L1 ≤1 条 / 寒暄 L0 零注入，50ms 超时宁缺勿滥）+ **常驻基线快照**（`build_static_snapshot`：approved 画像 + 高置信永久经验，digest 变更检测）。设计中的"三层注入"（常驻基线 + 拉式检索 + 收尾写提示）已实现前两层，第三层由现有 turn/end 自动提取覆盖。
 
 ### 遗忘是记忆的一部分 + 生命周期完备
 
@@ -63,7 +63,7 @@ DeepSeek Harness (host 插件进程)
 
 记忆库（`memory-tree`）与知识库（`memory-wiki`）是**两个独立的库**，刻意不混：
 
-- **记忆 = 关于"你"的经历**：事件/事件链/经验（`lesson_pending`/`lesson_permanent`），随对话生长，属于个人时间线。画像（`profiles`）是设计中的第四类，当前未接线（见"已知限制"）。
+- **记忆 = 关于"你"的经历**：事件/事件链/经验（`lesson_pending`/`lesson_permanent`）/画像（`profiles`，已接线蒸馏，见"已知限制"），随对话生长，属于个人时间线。
 - **知识 = 关于"世界"的规范**：wiki 条目（spec 规范 / concept 概念 / tutorial 教程），是客观知识体。
 - 分离原因：**知识条目不进记忆树，避免污染画像与经历**（`wiki.py` 原话）；检索策略也不同——记忆走 BM25+RRF，知识规范量大走条文级倒排（按"第X章→第X节→第X条"语义切块，不按 token 硬切）。
 - UI 对应两个独立 tab：**事件图谱**（记忆树）与**知识图谱**（wiki 树），各自力导向图，互不混淆。
@@ -180,16 +180,16 @@ dsh plugin --profile web remove dsh-memory-bridge
 
 ## 已知限制
 
-以下为引擎/桥接层**已实现但当前未接线**或**仅设计未实现**的功能，如实披露（引擎侧类与提示词完整，桥接层暂无入口）：
+引擎/桥接层中**已实现未接线**或**由现有机制覆盖**的功能，如实披露：
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| **画像蒸馏**（`distill.py` → `profiles/PROFILE.md`）| 已实现未接线 | `ProfileDistiller`/`DistillWorker` 类完整（收集事件树 → LLM → 草稿防抖去重），但 sidecar 无触发入口；overview 的 `profile` 计数恒为 0 |
-| **常驻基线注入**（`build_static_snapshot`）| 未实现 | 设计中的"低频推式"注入层（画像 + 永久经验常驻），当前注入只有拉式检索一层 |
-| **收尾写入提示**（固定提示行）| 未实现 | 设计中的"高频固定行"写入钩子（`agent/turn-stopping`），当前写入靠 turn/end 自动提取 + `memory_add_run` 工具 |
-| **画像/人格模块**（`profile.py`/`persona.py`）| 未接线 | 与 distill 同属画像链路，类完整但无调用方 |
+| **画像蒸馏**（`distill.py` → `profiles/PROFILE.md`）| ✅ 已接线 | sidecar 提供 `distill` / `distillApprove` / `distillReject` / `profileStatus` 四个 RPC；手动触发一轮蒸馏 → 产出草稿 → 审批固化（version+1）→ 画像进入注入常驻基线。实测端到端通过 |
+| **常驻基线注入**（`build_static_snapshot`）| ✅ 已实现 | `MemoryInjector.build_static_snapshot`：approved 画像 + 高置信 lesson_permanent，digest 变更检测（未变则复用旧文本，KV-cache 友好）；`rpc_inject` 已并入 |
+| **收尾写入提示**（固定提示行）| ✅ 已覆盖 | 设计中的"固定提示行让模型自己写"，现有实现是其超集：`turn/end` 自动提取（不依赖模型自觉）+ `memory_add_run` 工具显式入队 |
+| **画像/人格模块**（`profile.py`/`persona.py`）| ✅ 已接线（profile 部分）| `ProfileStore` 已装配；`persona.py`（人格库选择）仍无调用方（蒸馏产出 MBTI 但人格选择器未接） |
 
-> 这些是引擎设计意图的一部分（README 设计理念章节有详述），当前以"事件/链/经验"为主干运行；画像链路接线是后续路线图，不影响现有记忆功能。
+> 画像蒸馏为手动触发（UI 待补按钮，或直接 RPC）；自动调度（每周 + idle 门槛）的 `DistillWorker` 已实现，sidecar 暂未启动后台线程（避免与 harness 生命周期耦合，可后续接入）。
 
 ## 开发与测试
 

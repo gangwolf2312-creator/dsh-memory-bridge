@@ -193,6 +193,11 @@ def ensure_engine() -> dict[str, Any]:
         # 启动对账：清理历史积压（30 天 idle 的枝完结 + 子卡枯萎；幂等）
         with contextlib.suppress(Exception):
             decay.run_once()
+        # 画像蒸馏装配（distill.py 已实现未接线 → 桥接层补入口）：
+        # backends 复用提取器后端链（role=extract 优先，蒸馏不额外要求 LLM 通道）
+        from memory.profile import ProfileStore
+
+        _profile_store = ProfileStore(Path(mem.resolve_memory_root()))
         _engine = {
             "mem": mem,
             "store": store,
@@ -201,6 +206,7 @@ def ensure_engine() -> dict[str, Any]:
             "wiki_search": wiki_search,
             "lemonade": lemonade,
             "injector": MemoryInjector(search),
+            "profile_store": _profile_store,
             "decay": decay,
             "apply_usage_feedback": apply_usage_feedback,
             "govern_injection": govern_injection,
@@ -569,6 +575,95 @@ def rpc_config_get(_params: dict[str, Any] | None = None) -> dict[str, Any]:
     return {"config": masked_config(), "lemonade": _lemonade_payload()}
 
 
+# ---------------------------------------------------------------------------
+# 画像蒸馏（distill.py 接线：手动触发 + 审批 + 状态）
+# ---------------------------------------------------------------------------
+
+def _profile_distiller(eng: dict[str, Any]):
+    """按当前配置装配 ProfileDistiller（复用提取器后端链）。"""
+    from memory.distill import ProfileDistiller
+
+    cfg = load_config()
+    extractor = eng["mem"].build_extractor(to_extract_config(cfg))
+    if extractor is None:
+        raise ValueError("distill 需要激活提取后端（off 模式无 LLM 可用）：请先配置 mode=local/cloud/main/hybrid")
+    backends: list = []
+    if getattr(extractor, "backend", None) is not None:
+        backends.append(extractor.backend)
+    if getattr(extractor, "fallback_backend", None) is not None:
+        backends.append(extractor.fallback_backend)
+    if not backends:
+        raise ValueError("distill 无可用 LLM 后端")
+    # count_tokens：启发式（字符 / 2 近似；引擎无 tokenizer 契约）
+    def _count_tokens(text: str) -> int:
+        return max(1, len(text) // 2)
+
+    return ProfileDistiller(
+        store=eng["profile_store"],
+        memory=eng["store"],
+        backends=backends,
+        count_tokens=_count_tokens,
+    )
+
+
+def rpc_distill(params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """手动触发一轮画像蒸馏；产出 profiles/drafts/*.md 待审批。"""
+    eng = ensure_engine()
+    try:
+        distiller = _profile_distiller(eng)
+        draft = distiller.distill()
+    except Exception as exc:  # noqa: BLE001
+        eng["store"].log_decision("distill_rpc_error", str(exc)[:300])
+        return {"ok": False, "error": f"distill failed: {exc}"}
+    if draft is None:
+        return {"ok": True, "draft": None, "note": "无事件可蒸馏 / 防抖跳过 / 去重跳过"}
+    return {"ok": True, "draft": {"summary": draft.summary[:120], "status": draft.status}}
+
+
+def rpc_distill_approve(params: dict[str, Any]) -> dict[str, Any]:
+    """审批画像草稿 → PROFILE.md（status=approved，version+1）。"""
+    eng = ensure_engine()
+    draft_id = str(params.get("draftId", ""))
+    try:
+        approved = eng["profile_store"].approve(draft_id)
+    except KeyError as exc:
+        return {"ok": False, "error": str(exc)}
+    eng["store"].log_decision("distill_approve", f"{draft_id} -> approved")
+    return {"ok": True, "profile": {"summary": approved.summary[:120], "version": approved.version, "status": approved.status}}
+
+
+def rpc_distill_reject(params: dict[str, Any]) -> dict[str, Any]:
+    """驳回画像草稿 → profiles/rejected/（明文保留）。"""
+    eng = ensure_engine()
+    draft_id = str(params.get("draftId", ""))
+    try:
+        eng["profile_store"].reject(draft_id)
+    except KeyError as exc:
+        return {"ok": False, "error": str(exc)}
+    eng["store"].log_decision("distill_reject", draft_id)
+    return {"ok": True}
+
+
+def rpc_profile_status(_params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """画像状态：approved 主画像 + 待审草稿列表。"""
+    eng = ensure_engine()
+    store = eng["profile_store"]
+    approved = store.load()
+    drafts = []
+    for name, p in store.list_drafts():
+        drafts.append({"draftId": name, "summary": p.summary[:100], "mbti": p.mbti, "updatedAt": p.updated_at})
+    return {
+        "ok": True,
+        "approved": {
+            "summary": approved.summary,
+            "mbti": approved.mbti,
+            "updatedAt": approved.updated_at,
+            "version": approved.version,
+        } if approved is not None and approved.status == "approved" else None,
+        "drafts": drafts,
+    }
+
+
 def rpc_config_set(params: dict[str, Any]) -> dict[str, Any]:
     cfg = params.get("config")
     if not isinstance(cfg, dict):
@@ -835,7 +930,16 @@ def rpc_inject(params: dict[str, Any]) -> dict[str, Any]:
     results = _dedup_inject(inj.inject_for_tier(tier, query))
     if session_id:
         _cache_put(session_id, results)
+    # 常驻基线快照（低频推式层）：approved 画像 + 高置信永久经验，digest 变更检测
+    snapshot_text = ""
+    snapshot_digest = ""
+    with contextlib.suppress(Exception):
+        profile = eng["profile_store"].load()
+        approved = profile if (profile is not None and profile.status == "approved") else None
+        snapshot_text, snapshot_digest = inj.build_static_snapshot(profile=approved)
     text = "\n".join(inj.format_result(r) for r in results)
+    if snapshot_text:
+        text = (snapshot_text + "\n" + text).strip()
     return {
         "text": text,
         "tier": tier,
@@ -850,6 +954,7 @@ def rpc_inject(params: dict[str, Any]) -> dict[str, Any]:
             for r in results
         ],
         "count": len(results),
+        "snapshotDigest": snapshot_digest,
     }
 
 
@@ -946,6 +1051,10 @@ METHODS: dict[str, Any] = {
     "inject": rpc_inject,
     "recordUsage": rpc_record_usage,
     "maintenance": rpc_maintenance,
+    "distill": rpc_distill,
+    "distillApprove": rpc_distill_approve,
+    "distillReject": rpc_distill_reject,
+    "profileStatus": rpc_profile_status,
 }
 
 
