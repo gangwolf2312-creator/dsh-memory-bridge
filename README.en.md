@@ -195,6 +195,20 @@ DeepSeek Harness (host plugin process)
 | **Cannot replace full session-history replay** | Design boundary | On resume, DSH replays the entire history into context; plugin injection **adds to** the history and **cannot replace or suppress it** (history is fully derived by dsh-session `deriveMessages`; the plugin has no trimming API). In-session history slimming relies on DSH compaction |
 | Small local-model edge cases | Design boundary | 4B-class local models fluctuate on spec-clause/alias edge cases; cloud is fully green; low confidence goes to pending human review |
 
+### Language note (currently Chinese-first)
+
+**The plugin is currently optimized for Chinese.** The following parts depend heavily on Chinese; English users would need to adapt them:
+
+| Part | Where Chinese is used | What English users would change |
+|---|---|---|
+| **Zero-LLM rule triggers** | `rules.py` (记住/记下/记住教训/踩坑/我喜欢/习惯/别用 etc.) + `guard.py` (_DIRECTIVE / _FACT_HINTS / _CHIT_CHAT) | **Append English triggers** to the tuples (remember / lesson learned / I like / don't use / today / project / thanks) — pure data change, logic untouched |
+| **LLM extraction prompts** | `extract.py` `_EXTRACT_PROMPT` / `_EXTRACT_PROMPT_SMALL` (Chinese extraction instructions + examples) | Write an **English prompt variant** and measure extraction quality (the prompt is the quality gate; do not just translate) |
+| **Profile distillation prompt** | `distill.py` `DISTILL_PROMPT` (Chinese) | Same, English variant |
+| **UI strings** | `client/client.js`, 141 Chinese UI strings (tab names / labels / hints) | Replace with English, or bilingual |
+| **Agent tool descriptions** | `lib/index.js`, 3 tool `description` fields (model-visible) | English helps the model understand tool purpose |
+
+> **Note**: for bilingual coexistence with automatic prompt selection by conversation language, a **language-detection step** would need to be added (not implemented; the extraction prompt is fixed to Chinese). Without it the plugin still works — English content is extracted by the Chinese prompt (LLMs understand Chinese instructions) — but English users should evaluate whether extraction quality is acceptable.
+
 ---
 
 ## Installation
