@@ -10,7 +10,7 @@ DeepSeek Harness (host 插件进程)
 │                         自动提取钩子（turn/end）、自动注入钩子（user/message → system prompt context）
 ├── python/memory_bridge_server.py   sidecar：JSON-RPC over HTTP，承载记忆树引擎 + 衰减治理 + lemonade
 ├── engine/               记忆树引擎源码（core/ + memory/，依赖声明式安装，见下）
-└── client/client.js      设置页 UI（6 个 tab：总览 / 事件图谱 / 知识图谱 / 时间线 / 待审 / 审计）
+└── client/client.js      设置页 UI（7 个 tab：总览 / 事件图谱 / 知识图谱 / 时间线 / 待审 / 画像 / 审计）
 ```
 
 - **记忆引擎**：随插件携带 `engine/`（明文 markdown 真源 + SQLite 检索索引 + BM25/RRF 确定性检索，零外部服务依赖）。
@@ -145,18 +145,19 @@ dsh plugin --profile web remove dsh-memory-bridge
 | 知识图谱 | wiki 条目力导向图（上位/版本关系）+ 搜索 + 条目列表 |
 | 时间线 | 事件流按日期分组（今天 / 昨天 / 2-6 天前，更早归入"更早"），时间倒序 |
 | 待审 | 提取队列 / pending 经验审批 |
+| 画像 | 查看已审批画像（摘要/MBTI/版本）· 「蒸馏画像」按钮（从事件树 LLM 生成草稿）· 待审草稿采纳/驳回（badge 显示草稿数）|
 | 审计 | 注入/提取统计 + 「立即维护」按钮（手动衰减+治理）+ 决策日志 |
 
 ## 界面预览
 
-> 设置页 → 记忆（`/settings` 内）。截图来自真实运行实例（事件 147 / 链 34 / 注入利用率 93%）。
+> 设置页 → 记忆（`/settings` 内）。截图来自真实运行实例。
 
 | | |
 |---|---|
 | **总览**：统计卡片 / 记忆构成环形图 / 本地推理状态 / 提取注入审计 / 提取配置表单 | **事件图谱**：力导向图（方向箭头、链着色）+ 下方记忆树联动导航 |
 | ![总览](docs/screenshots/overview.png) | ![事件图谱](docs/screenshots/event-graph.png) |
-| **知识图谱**：wiki 条目力导向图（上位/版本关系）+ 搜索 + 条目列表 | **时间线**：事件流按日分组（今天/昨天/2-6 天前），时间倒序 |
-| ![知识图谱](docs/screenshots/wiki-graph.png) | ![时间线](docs/screenshots/timeline.png) |
+| **审计**：注入/提取统计 + 「立即维护」按钮（手动衰减+治理）+ 决策日志 | |
+| ![审计](docs/screenshots/audit.png) | |
 
 ## Agent 工具
 
@@ -168,8 +169,8 @@ dsh plugin --profile web remove dsh-memory-bridge
 
 ## HTTP API（浏览器代理，host 转发到 sidecar）
 
-- `GET  /dsh-memory/overview` `health` `search?q=` `browse?kind=` `card?id=` `review?runId=` `wiki?q=` `config` `lemonade-status` `audit` `graph`（只读，需带 `x-dsh-memory: 1` header 或同源 Origin，见安全）
-- `POST /dsh-memory/card-action` `add-run` `config` `lemonade-ensure` `extract` `maintenance`（写操作，同源校验）
+- `GET  /dsh-memory/overview` `health` `search?q=` `browse?kind=` `card?id=` `review?runId=` `wiki?q=` `config` `lemonade-status` `audit` `graph` `profile-status`（只读，需带 `x-dsh-memory: 1` header 或同源 Origin，见安全）
+- `POST /dsh-memory/card-action` `add-run` `config` `lemonade-ensure` `extract` `maintenance` `distill` `distill-approve` `distill-reject`（写操作，同源校验）
 - `inject` / `recordUsage` 不暴露为 HTTP 路由：宿主插件在事件钩子（user/message 预取、turn/end 审计）内部直连 sidecar 调用，浏览器不可直接触发。
 
 ## 安全
@@ -189,7 +190,7 @@ dsh plugin --profile web remove dsh-memory-bridge
 | **收尾写入提示**（固定提示行）| ✅ 已覆盖 | 设计中的"固定提示行让模型自己写"，现有实现是其超集：`turn/end` 自动提取（不依赖模型自觉）+ `memory_add_run` 工具显式入队 |
 | **画像/人格模块**（`profile.py`/`persona.py`）| ✅ 已接线（profile 部分）| `ProfileStore` 已装配；`persona.py`（人格库选择）仍无调用方（蒸馏产出 MBTI 但人格选择器未接） |
 
-> 画像蒸馏为手动触发（UI 待补按钮，或直接 RPC）；自动调度（每周 + idle 门槛）的 `DistillWorker` 已实现，sidecar 暂未启动后台线程（避免与 harness 生命周期耦合，可后续接入）。
+> 画像蒸馏为**手动触发**（设置页 → 记忆 → 「画像」tab → 「蒸馏画像」按钮，或直接 RPC `distill`）；自动调度（每周 + idle 门槛）的 `DistillWorker` 已实现，sidecar 暂未启动后台线程（避免与 harness 生命周期耦合，可后续接入）。
 
 ## 开发与测试
 
