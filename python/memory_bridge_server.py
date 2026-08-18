@@ -747,6 +747,37 @@ def rpc_extract(params: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "mode": mode, "extracted": total, "processed": total}
 
 
+def rpc_record_signals(params: dict[str, Any]) -> dict[str, Any]:
+    """规则台账（PreferenceLedger）：扫描一轮对话的偏好信号，聚合 ≥3 同类 → lesson_pending 提案。
+
+    沉淀经验（lesson_permanent）通道：偏好信号 → 提案（pending）→ 人工采纳（promote_lesson）。
+    提取提示词会把偏好标 explicit 直接成 event 卡，此通道独立识别偏好，二者互补。
+    """
+    eng = ensure_engine()
+    from memory.rules import PreferenceLedger
+
+    user_text = str(params.get("userText", ""))
+    reply_text = str(params.get("replyText", ""))
+    source = str(params.get("sourcePath", "")) or "runs/staged"
+    ledger = PreferenceLedger(eng["store"], source_path=source)
+    recorded = 0
+    for text in (user_text, reply_text):
+        if text.strip():
+            try:
+                sig = ledger.record(text)
+                if sig is not None:
+                    recorded += 1
+            except Exception:  # noqa: BLE001 - 单条信号失败不影响其余
+                continue
+    proposed = []
+    with contextlib.suppress(Exception):
+        for card in ledger.propose():
+            proposed.append({"cardId": card.id, "title": card.title})
+    if proposed:
+        eng["store"].log_decision("lesson_propose", f"{len(proposed)} 张偏好提案")
+    return {"ok": True, "recorded": recorded, "proposed": proposed}
+
+
 def rpc_audit(_params: dict[str, Any] | None = None) -> dict[str, Any]:
     eng = ensure_engine()
     store = eng["store"]
@@ -1074,6 +1105,7 @@ METHODS: dict[str, Any] = {
     "configGet": rpc_config_get,
     "configSet": rpc_config_set,
     "extract": rpc_extract,
+    "recordSignals": rpc_record_signals,
     "audit": rpc_audit,
     "graph": rpc_graph,
     "inject": rpc_inject,
