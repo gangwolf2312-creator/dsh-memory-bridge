@@ -193,6 +193,7 @@ class MemorySearch:
         expand: bool = True,
         project_id: str | None = None,
         project_by_run: dict[str, str] | None = None,
+        track_hits: bool = True,
     ) -> list[SearchResult]:
         """检索（B4：枝级路标 + 树导航下钻 + 限定多跳；A7 命中统计照旧）。
 
@@ -200,6 +201,9 @@ class MemorySearch:
         - timeline：时间线模式，按 created_at 升序返回（query 非空时先按相关度过滤）
         - expand：多跳扩展（沿链兄弟 + 同枝/散叶实体）；枝级路标始终生效（第一轮导航）
         - project_id + project_by_run：项目加权（同项目 ×2 / 跨项目 ×0.3 / 无归属 ×1）
+        - track_hits（v0.5 根本修复）：True = 命中/未命中统计 + miss 归档记账（UI 检索/工具
+          用）；False = **纯只读**（注入用——注入查询是低频无关 query，若记账会把无关卡
+          miss 累积到 50 后批量归档，实测 66 张卡被测试 query 误归档）
         - 链卡是结构不是事实，不进基础检索；但作为「枝级路标」参与定位与结果标注
         """
         query_tokens = tokenize(query)
@@ -349,22 +353,23 @@ class MemorySearch:
                 )
             )
 
-        hit_ids = {r.card_id for r in results}
-        now = now_iso()
-        hit_list = [c.id for c in cards if c.id in hit_ids]
-        archive_list = [
-            c.id
-            for c in cards
-            if c.id not in hit_ids and c.miss_count + 1 >= self.archive_after_misses
-        ]
-        miss_list = [
-            c.id
-            for c in cards
-            if c.id not in hit_ids and c.miss_count + 1 < self.archive_after_misses
-        ]
-        self.store.update_hits(hit_list, now)
-        self.store.update_misses(miss_list)
-        self.store.archive_cards(archive_list)
+        if track_hits:
+            hit_ids = {r.card_id for r in results}
+            now = now_iso()
+            hit_list = [c.id for c in cards if c.id in hit_ids]
+            archive_list = [
+                c.id
+                for c in cards
+                if c.id not in hit_ids and c.miss_count + 1 >= self.archive_after_misses
+            ]
+            miss_list = [
+                c.id
+                for c in cards
+                if c.id not in hit_ids and c.miss_count + 1 < self.archive_after_misses
+            ]
+            self.store.update_hits(hit_list, now)
+            self.store.update_misses(miss_list)
+            self.store.archive_cards(archive_list)
         return results
 
     def _fts_scores(self, cards: list[MemoryCard], query_tokens: list[str]) -> list[float]:

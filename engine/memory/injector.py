@@ -4,14 +4,29 @@
 - 超时：检索 50ms 超时 → 空注入（宁缺勿滥，不拖慢 TTFT）
 - 溯源：每条命中带 [长期记忆·来源/链/日期] 标记，供 assembler M 桶渲染
 - 本模块只做"检索 + 格式化"，不依赖 context（注入组装在 kernel 层 provider）
+
+v0.5 根本修复（检索质量）：注入相关度改为**数据驱动分级门槛**，废除人工词表
+（v0.4 的 _INJECT_STOPWORDS 属正则补丁，实测仍漏：query"要不要采用左侧边栏的
+折叠逻辑…"靠单词"采用/逻辑"误注入无关卡）：
+- query 核心词：jieba.posseg 词性提取（名词/动词/形容词/方位/时间/习语等实词，
+  滤代词/助词/连词/副词/数词/量词；英文词 ≥4 字符），不再依赖人工停用词表
+- 卡库词频 df：从 cards.tokens 列统计（词级，进程内缓存 60s）
+- 事件卡（流水）：≥2 个核心词重叠，或单核心词重叠且 df≤3（idf≥4.5 的稀有词）
+  ——实测单"采用"(df10)/"逻辑"(df15)/"整体"均不过；"偏好"(df19) 也低于
+  稀有阈值，说明单重叠词（无论稀有度）不足以证明事件卡相关
+- 事实卡（lesson/pending/偏好画像）：≥1 个核心词重叠即注入——它们是"关于
+  用户的事实"，弱相关即可（"我的偏好"→ 偏好卡）
 """
 
 from __future__ import annotations
 
 import contextlib
+import math
 import time
+from collections import Counter
 
 from core.types import IntentTier
+from jieba import posseg
 from memory.audit import detect_inject_usage
 from memory.models import SearchResult
 from memory.search import MemorySearch
@@ -22,42 +37,106 @@ __all__ = ["MemoryInjector"]
 
 _LIMITS = {IntentTier.L0: 0, IntentTier.L1: 1, IntentTier.L2: 3}
 
-# v0.4 抢救修复（注入噪音）：通用/修饰/虚词——query 与卡仅这些词面重叠不算相关。
-# 实测噪音案例：query"整体UI，特别是浏览器UI在深色模式下居然是白色"仅因"整体
-# 平移"命中图谱卡（重叠词元 {体,是,整体,居,整} 全为通用词/单字）而注入无关卡。
-# 词表克制收录高频虚词/修饰词；单字由 len>1 过滤，不进表。
-_INJECT_STOPWORDS = frozenset({
-    "整体", "全部", "所有", "任何", "一切", "这个", "那个", "这些", "那些",
-    "这种", "那种", "这样", "那样", "一些", "一个", "一种", "一下", "有点",
-    "怎么", "什么", "为什么", "如何", "怎样", "哪个", "哪些", "多少", "几",
-    "特别", "非常", "比较", "很", "挺", "都", "也", "就", "还", "再", "又",
-    "和", "与", "或", "的", "了", "在", "是", "有", "没", "不", "把", "被",
-    "让", "使", "用", "对", "从", "到", "向", "为", "给", "等", "以及",
-    "因为", "所以", "但是", "然而", "如果", "那么", "然后", "居然", "到底",
-    "究竟", "起来", "出来", "过来", "下去", "应该", "可以", "可能", "需要",
-    "觉得", "认为", "问题", "情况", "方式", "方法", "东西", "时候", "地方",
-    "部分", "方面", "关于", "针对", "通过", "进行", "作为", "由于", "根据",
-    "按照", "例如", "比如",
-})
+# 事件卡单核心词重叠的稀有度门槛：df ≤ 3（idf ≥ 4.5 @ N≈357）。
+# 数据校准（2026-08-19，N=357）：采用 df10/idf3.53、逻辑 df15/idf3.14、
+# 整体 df≈10、显示 df24 全部低于门槛；数据库 df1/边栏 df2/聚团 df2 等
+# 稀有词单重叠仍可注入（强信号）。
+_SINGLE_WORD_MAX_DF = 3
+
+# 卡库词频缓存：tokens 列统计（词级），进程内 60s 过期（注入热路径零额外 IO）
+_DF_CACHE: dict = {"at": 0.0, "df": None}
 
 
-def _inject_overlap(query: str, text: str) -> int:
-    """注入相关度的实质词面重叠数：纯 jieba 词级，滤单字、通用词与短英文泛缩写。
+def _query_core_words(query: str) -> set[str]:
+    """query 核心词：jieba 词性提取实词（数据驱动，无人工词表）。
 
-    返回重叠词数；0 = 无实质词面相关 → 不注入。v0.4 抢救修复：弱词面重叠
-    （仅通用词/单字命中）不再构成注入依据（实测"整体"误注入图谱卡；
-    "ui" 泛缩写误注入"UI 总览"卡）。规则：
-    - 中文词 ≥2 字；英文词 ≥4 字符（ui/api/id 等短缩写是泛词，不计）
-    - 停用词表（_INJECT_STOPWORDS）过滤高频虚词/修饰词
+    保留：名词(n)/动词(v)/形容词(a)/方位(f)/时间(t)/习语(l/i)/简称(j)；
+    过滤：代词(r)/助词(u)/连词(c)/副词(d)/介词(p)/数词(m)/量词(q)/标点(x)；
+    英文词 ≥4 字符（ui/api/id 等泛缩写不计）；单字不计。
     """
-    def _words(text: str) -> set[str]:
-        return {
-            w for w in tokenize_words(text or "")
-            if len(w) > 1
-            and w not in _INJECT_STOPWORDS
-            and not (w.isascii() and len(w) < 4)
-        }
-    return len(_words(query) & _words(text))
+    out: set[str] = set()
+    for w, flag in posseg.cut(query or ""):
+        if len(w) < 2:
+            continue
+        if w.isascii():
+            if len(w) >= 4:
+                out.add(w.lower())
+            continue
+        if flag[:1] in ("n", "v", "a", "f", "t", "l", "i", "j"):
+            out.add(w)
+    return out
+
+
+def _card_df(store) -> tuple[Counter, int]:
+    """卡库词级文档频率（tokens 列统计，缓存 60s）；返回 (df, n_docs)。"""
+    now = time.monotonic()
+    cached = _DF_CACHE["df"]
+    if cached is not None and now - _DF_CACHE["at"] < 60.0:
+        return cached, _DF_CACHE["n"]
+    df: Counter = Counter()
+    n = 0
+    try:
+        rows = store._exec("SELECT tokens FROM cards WHERE status = 'active'").fetchall()
+        for (tokens,) in rows:
+            n += 1
+            seen: set[str] = set()
+            for w in (tokens or "").split():
+                if len(w) > 1:
+                    seen.add(w)
+            for w in seen:
+                df[w] += 1
+    except Exception:
+        pass
+    _DF_CACHE["df"] = df
+    _DF_CACHE["n"] = n
+    _DF_CACHE["at"] = now
+    return df, n
+
+
+def _idf(n_docs: int, df: int) -> float:
+    """标准 idf（BM25 口径）：df=0 视为 0（库中无此词 → 无证据）。"""
+    if df <= 0:
+        return 0.0
+    return math.log(1 + (n_docs - df + 0.5) / (df + 0.5))
+
+
+def _card_tokens(store, card_id: str) -> set[str]:
+    """卡的词级 token 集（tokens 列；空则回退在线分词）。"""
+    try:
+        toks = store.card_tokens(card_id)
+        if toks:
+            return {w for w in toks if len(w) > 1}
+    except Exception:
+        pass
+    card = store.read_card(card_id)
+    if card is None:
+        return set()
+    return {w for w in tokenize_words(f"{card.title} {card.content}") if len(w) > 1}
+
+
+def _event_gate(
+    query_core: set[str],
+    card_tokens: set[str],
+    df: Counter,
+    n_docs: int,
+) -> float:
+    """事件卡注入门槛（v0.5）：多核心词重叠 或 单稀有词重叠。
+
+    返回加权分（>0 才注入）：多词 = 重叠词 idf 之和；单词 = 该词 idf（仅当
+    df ≤ _SINGLE_WORD_MAX_DF 的稀有词）。实测依据：单"采用/逻辑/整体"等
+    中等频率词重叠不足以证明相关（语境界别），单"数据库/边栏"等稀有词
+    重叠是强信号。
+    """
+    overlap = [w for w in query_core if w in card_tokens]
+    if not overlap:
+        return 0.0
+    if len(overlap) >= 2:
+        return sum(_idf(n_docs, df.get(w, 0)) for w in overlap)
+    w = overlap[0]
+    d = df.get(w, 0)
+    if d > _SINGLE_WORD_MAX_DF:
+        return 0.0
+    return _idf(n_docs, d)
 
 
 class MemoryInjector:
@@ -96,32 +175,38 @@ class MemoryInjector:
         # 池内再做事实优先 + 截断到 limit，保证"该记住的结论"有机会注入。
         # v0.4：注入禁用多跳扩展（expand=False）——沿链兄弟/实体扩展是树导航
         # 浏览语义，注入场景会把同链无关兄弟成倍拉高（实测图谱两张卡分数翻倍）。
+        # v0.5：track_hits=False 纯只读——注入查询不写 hit/miss/归档记账（A7
+        # 记账是 UI 检索语义；注入的无关查询会把无关卡 miss 累积到 50 批量归档，
+        # 实测 66 张卡被测试 query 误归档后已恢复）。
         pool_k = max(limit, limit * 3)
         results = self.search.search(
-            query, top_k=pool_k, expand=False,
+            query, top_k=pool_k, expand=False, track_hits=False,
             project_id=project_id, project_by_run=project_by_run,
         )
         elapsed_ms = (time.perf_counter() - started) * 1000
         if elapsed_ms > self.timeout_ms:
             return []  # A6：超时 → 空注入（宁缺勿滥）
-        # v0.4 抢救修复（注入噪音）：实质词面重叠门槛——search 的 BM25 词面匹配
-        # 会把仅"通用词/单字"重叠的无关卡带进来（实测"整体UI…深色模式白色"因
-        # "整体平移"命中图谱卡）。逐张取全文做词级重叠校验，无实质重叠 → 不注入。
-        gated: list[SearchResult] = []
+        # v0.5 根本修复：数据驱动分级门槛（废除人工词表）——
+        #   1) query 核心词 = jieba 词性提取的实词
+        #   2) 事件卡（search 结果）：≥2 核心词重叠 或 单稀有词（df≤3）
+        #   3) 事实卡（lesson/pending/偏好）：≥1 核心词重叠即注入
+        # search 的排序（RRF 多列）只用于候选召回，注入排序按本评分。
+        q_core = _query_core_words(query)
+        if not q_core:
+            return []  # query 无实义核心词（纯虚词）→ 零注入
+        df, n_docs = _card_df(self.search.store)
+        gated: list[tuple[float, SearchResult]] = []
         for r in results:
-            card = self.search.store.read_card(r.card_id)
-            if card is None:
+            toks = _card_tokens(self.search.store, r.card_id)
+            if not toks:
                 continue
-            if _inject_overlap(query, f"{card.title} {card.content}") <= 0:
-                continue
-            gated.append(r)
-        results = gated
-        # 抢救修复（v0.3，8 场景审计场景 1/3）：事实卡优先于事件流水——
-        # lesson_permanent/pending 与偏好卡是"该记住的结论"，event 是"发生过
-        # 的事"。search 多列 RRF 会把零使用史的事实卡挤出池子（实测 pref 卡
-        # BM25 第 1 仍不在 top-9），故先做事实卡补充检索（词面重叠打分），
-        # 再与检索池合并去重：事实卡在前、事件补位，截断到 limit。
-        facts = self._fact_lookup(query, limit)
+            score = _event_gate(q_core, toks, df, n_docs)
+            if score > 0:
+                gated.append((score, r))
+        gated.sort(key=lambda item: item[0], reverse=True)
+        results = [r for _, r in gated]
+        # 事实卡通道（v0.3 事实优先 + v0.5 门槛：核心词重叠 ≥1）
+        facts = self._fact_lookup(query, limit, q_core=q_core)
         seen: set[str] = set()
         merged: list[SearchResult] = []
         for r in [*facts, *results]:
@@ -149,22 +234,27 @@ class MemoryInjector:
             )
         return results
 
-    def _fact_lookup(self, query: str, limit: int) -> list[SearchResult]:
-        """事实卡补充检索：active 的 lesson_permanent/pending 卡直查 + 实质词面重叠打分。
+    def _fact_lookup(
+        self, query: str, limit: int, *, q_core: set[str] | None = None
+    ) -> list[SearchResult]:
+        """事实卡补充检索：active 的 lesson_permanent/pending 卡直查 + 核心词重叠。
 
         抢救修复（v0.3）：search 的多列 RRF（反馈/短语/枝路标）会把零使用史
         的事实卡挤出 top-N（实测：偏好卡 BM25 第 1 却不在 top-9，注入被事件
-        流水占满）。这里对 active 事实卡做确定性词面重叠打分，重叠 >0 即参与
-        注入排序——事实卡是"该记住的结论"，注入应优先于流水事件。
+        流水占满）。这里对 active 事实卡做确定性词面重叠，重叠 >0 即参与注入
+        排序——事实卡是"该记住的结论"，注入应优先于流水事件。
 
-        v0.4：重叠口径收紧为**实质词级**（_inject_overlap：纯 jieba 词、滤单字
-        与通用词）——与 search 结果的门槛同口径，防止单字/通用词把无关事实卡
-        拉进注入（如"整体"命中含"整体平移"的卡）。
+        v0.5：重叠口径 = query 核心词（词性提取实词）∩ 卡词；门槛 ≥1。
+        与事件卡不同：事实卡是"关于用户的事实"，弱相关即可（"我的偏好"→
+        偏好卡），不需要稀有词/多词门槛。
         """
         try:
             cards = self.search.store.all_cards()
             chain_titles = self.search.store.chain_title_map()
         except Exception:
+            return []
+        q_core = q_core if q_core is not None else _query_core_words(query)
+        if not q_core:
             return []
         scored: list[tuple[int, SearchResult]] = []
         for c in cards:
@@ -174,7 +264,8 @@ class MemoryInjector:
                 continue
             if getattr(c, "invalid_at", None):
                 continue
-            overlap = _inject_overlap(query, f"{c.title} {c.content}")
+            toks = _card_tokens(self.search.store, c.id)
+            overlap = len(q_core & toks)
             if overlap <= 0:
                 continue
             scored.append(

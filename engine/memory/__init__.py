@@ -2,7 +2,7 @@
 知识库支线（LLM Wiki）：WikiStore / WikiSearch，见 docs/WIKI-DESIGN.md。
 """
 
-__version__ = "0.1.1"  # 版本号规矩（2026-08-19 起）：每次 bug 修复/功能更新随代码 bump 并打 vX.Y.Z tag
+__version__ = "0.1.2"  # 版本号规矩（2026-08-19 起）：每次 bug 修复/功能更新随代码 bump 并打 vX.Y.Z tag
 
 from memory.backends import (
     BackendError,
