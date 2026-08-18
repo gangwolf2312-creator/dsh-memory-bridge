@@ -192,6 +192,7 @@ DeepSeek Harness (host plugin process)
 | Profile distillation is manual-triggered | Not finished | `DistillWorker` (weekly + idle-gate auto scheduling) is implemented but the sidecar doesn't start the background thread; currently click "Distill profile" manually |
 | `persona.py` (engine's built-in persona library) | Deliberately not wired | Agent personality is managed by **DSH's own persona plugin / system prompt** (engine README §9.5 exclusion list); this plugin handles memory, not agent persona |
 | Preference signals need ≥3 same-topic mentions to propose | Design boundary | Avoids a one-off mention becoming a permanent card; only repeated expression enters pending |
+| **Cannot replace full session-history replay** | Design boundary | On resume, DSH replays the entire history into context; plugin injection **adds to** the history and **cannot replace or suppress it** (history is fully derived by dsh-session `deriveMessages`; the plugin has no trimming API). In-session history slimming relies on DSH compaction |
 | Small local-model edge cases | Design boundary | 4B-class local models fluctuate on spec-clause/alias edge cases; cloud is fully green; low confidence goes to pending human review |
 
 ---
