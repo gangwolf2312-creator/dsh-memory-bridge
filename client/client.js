@@ -19,7 +19,7 @@ var CSS = [
 	"@keyframes dmb-grow { from { width: 0; } }",
 	"@keyframes dmb-pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }",
 	".dmb-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid var(--dmb-border); flex-wrap: wrap; }",
-	".dmb-logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(150deg, #1a2233 0%, #10151f 100%); box-shadow: inset 0 0 0 1px rgba(122,146,255,0.18), 0 1px 3px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; flex: none; }",
+	".dmb-logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(150deg, #3a3f47 0%, #1b1e23 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.13), 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; flex: none; }",
 	".dmb-title { font-size: 14px; font-weight: 600; letter-spacing: 0.1px; }",
 	".dmb-subtitle { font-size: 12px; color: var(--dmb-text3); margin-top: 1px; }",
 	".dmb-pills { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }",
@@ -133,7 +133,38 @@ var CSS = [
 	".dmb-result .chain, .dmb-tag { display: inline-flex; align-items: center; gap: 4px; }",
 ].join("\n");
 
-var CSS2 = [].join("\n");
+var CSS2 = [
+	/* graph tab (Obsidian 式关系图谱) */
+	".dmb-graph-toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--dmb-border); flex-wrap: wrap; }",
+	".dmb-graph-toolbar .grow { flex: 1; }",
+	".dmb-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dmb-text2); cursor: pointer; user-select: none; }",
+	".dmb-check input { accent-color: var(--dmb-brand); cursor: pointer; }",
+	".dmb-graph-wrap { position: relative; border: 1px solid var(--dmb-border); border-radius: var(--dmb-radius); background-image: radial-gradient(circle, rgba(148,163,184,0.2) 1px, transparent 1.3px); background-size: 20px 20px; overflow: hidden; }",
+	".dmb-graph-svg { width: 100%; height: 540px; display: block; cursor: grab; touch-action: none; }",
+	".dmb-graph-svg.panning { cursor: grabbing; }",
+	".dmb-graph-node { cursor: pointer; }",
+	".dmb-graph-node circle { transition: r 0.12s ease, opacity 0.18s ease; stroke: var(--dmb-card); stroke-width: 1.5px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.22)); }",
+	".dmb-graph-node:hover circle, .dmb-graph-node.active circle { filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }",
+	".dmb-graph-node text { font-size: 10.5px; fill: var(--dmb-text3); opacity: 0.82; pointer-events: none; user-select: none; paint-order: stroke; stroke: var(--dmb-card); stroke-width: 2.5px; transition: opacity 0.15s ease; }",
+	".dmb-graph-node:hover text, .dmb-graph-node.active text { fill: var(--dmb-text); font-weight: 600; opacity: 1; }",
+	".dmb-graph-edge { transition: opacity 0.18s ease; opacity: 0.7; }",
+	"@keyframes dmb-dashflow { to { stroke-dashoffset: -36; } }",
+	".dmb-graph-edge.lit { stroke-dasharray: 9 7 !important; animation: dmb-dashflow 0.7s linear infinite; }",
+	".dmb-graph-tip { position: absolute; pointer-events: none; z-index: 30; max-width: 280px; padding: 9px 11px; border-radius: 9px; background: var(--dmb-card); border: 1px solid var(--dmb-border2); box-shadow: 0 10px 28px rgba(0,0,0,0.28); font-size: 12px; color: var(--dmb-text); opacity: 0; transition: opacity 0.12s ease; }",
+	".dmb-graph-tip .t { font-weight: 600; margin-bottom: 2px; }",
+	".dmb-graph-tip .k { color: var(--dmb-text3); font-size: 10.5px; }",
+	".dmb-graph-side { border: 1px solid var(--dmb-border); border-radius: var(--dmb-radius); background: var(--dmb-card); padding: 14px 16px; margin-top: 12px; animation: dmb-fadeUp 0.25s ease both; }",
+	".dmb-graph-side h4 { margin: 0 0 10px; font-size: 13px; display: flex; align-items: center; gap: 8px; }",
+	".dmb-graph-side .meta { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 12px; }",
+	".dmb-graph-side .meta .k { color: var(--dmb-text3); }",
+	".dmb-graph-side .meta .v { color: var(--dmb-text2); word-break: break-all; }",
+	".dmb-graph-side .neigh { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }",
+	".dmb-graph-side .neigh span { font-size: 11px; padding: 2px 9px; border-radius: 999px; background: var(--dmb-hover); color: var(--dmb-text2); cursor: pointer; }",
+	".dmb-graph-side .neigh span:hover { color: var(--dmb-text); background: var(--dmb-active); }",
+	".dmb-graph-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--dmb-text3); align-items: center; }",
+	".dmb-graph-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }",
+	".dmb-graph-hint { font-size: 11px; color: var(--dmb-text3); }",
+].join("\n");
 
 if (typeof document !== "undefined" && !document.getElementById("dmb-styles")) {
 	var style = document.createElement("style");
@@ -217,7 +248,7 @@ function SnakeLogo(props) {
 	var dots = [];
 	for (var r = 0; r < 3; r++) {
 		for (var c = 0; c < 3; c++) {
-			dots.push(h("circle", { key: "g" + r + "_" + c, cx: 5 + c * 5, cy: 5 + r * 5, r: 1.3, fill: "rgba(122,146,255,0.34)" }));
+			dots.push(h("circle", { key: "g" + r + "_" + c, cx: 5 + c * 5, cy: 5 + r * 5, r: 1.3, fill: "rgba(255,255,255,0.18)" }));
 		}
 	}
 	var segs = trail.map(function (p, i) {
@@ -227,10 +258,10 @@ function SnakeLogo(props) {
 			cx: 5 + p[1] * 5,
 			cy: 5 + p[0] * 5,
 			r: head ? 2.2 : 1.7,
-			fill: "#4d8dff",
+			fill: head ? "#ffffff" : "#c9cdd4",
 			style: {
-				opacity: head ? 1 : (i === 1 ? 0.6 : 0.35),
-				filter: head ? "drop-shadow(0 0 3.5px rgba(77,141,255,0.95)) drop-shadow(0 0 9px rgba(77,141,255,0.45))" : "none",
+				opacity: head ? 1 : (i === 1 ? 0.65 : 0.4),
+				filter: head ? "drop-shadow(0 0 3.5px rgba(255,255,255,0.85)) drop-shadow(0 0 9px rgba(255,255,255,0.35))" : "none",
 				transition: "cx 0.3s ease, cy 0.3s ease"
 			}
 		});
@@ -240,9 +271,12 @@ function SnakeLogo(props) {
 /* atoms */
 function Counter(props) {
 	var value = props.value, suffix = props.suffix || "", prefix = props.prefix || "";
-	var _s = useState(0), shown = _s[0], setShown = _s[1];
+	// 非数字值（如 "100%" / "—"）直接原样显示，不做计数动画（数字动画对字符串会算出 NaN）
+	var numeric = typeof value === "number" && Number.isFinite(value);
+	var _s = useState(numeric ? 0 : value), shown = _s[0], setShown = _s[1];
 	useEffect(function () {
-		var from = 0, to = value || 0, start = performance.now(), dur = 650, raf;
+		if (!numeric) return;  // 字符串/其它：静态显示
+		var from = 0, to = value, start = performance.now(), dur = 650, raf;
 		function tick(now) {
 			var p = Math.min(1, (now - start) / dur);
 			var eased = 1 - Math.pow(1 - p, 3);
@@ -251,7 +285,7 @@ function Counter(props) {
 		}
 		raf = requestAnimationFrame(tick);
 		return function () { cancelAnimationFrame(raf); };
-	}, [value]);
+	}, [value, numeric]);
 	return h("span", null, prefix, shown, suffix);
 }
 
@@ -294,7 +328,8 @@ function useToast() {
 
 function Donut(props) {
 	var data = props.data || [];
-	var total = data.reduce(function (s, d) { return s + d.value; }, 0) || 1;
+	var rawTotal = data.reduce(function (s, d) { return s + d.value; }, 0);
+	var total = rawTotal || 1;
 	var R = 44, C = 2 * Math.PI * R, offset = 0;
 	return h("div", { className: "dmb-donut-wrap" },
 		h("svg", { width: 110, height: 110, viewBox: "0 0 110 110" },
@@ -307,7 +342,7 @@ function Donut(props) {
 				offset += len;
 				return el;
 			}),
-			h("text", { x: 55, y: 52, "text-anchor": "middle", fill: "currentColor", "font-size": "18", "font-weight": "800" }, String(total)),
+			h("text", { x: 55, y: 52, "text-anchor": "middle", fill: "currentColor", "font-size": "18", "font-weight": "800" }, String(rawTotal)),
 			h("text", { x: 55, y: 70, "text-anchor": "middle", fill: "currentColor", opacity: 0.55, "font-size": "9" }, "记忆卡")
 		),
 		h("div", { className: "dmb-legend" }, data.map(function (d) {
@@ -343,6 +378,7 @@ function MemoryPanel() {
 
 	var tabs = [
 		{ id: "overview", label: "总览" },
+		{ id: "graph", label: "图谱" },
 		{ id: "cards", label: "记忆卡" },
 		{ id: "wiki", label: "知识库" },
 		{ id: "review", label: "待审", badge: pendingCount || undefined },
@@ -369,6 +405,7 @@ function MemoryPanel() {
 		h("div", { className: "dmb-body" },
 			loading && tab === "overview" ? h(Spinner, null) : null,
 			tab === "overview" ? h(OverviewTab, { data: overview, refresh: refresh }) : null,
+			tab === "graph" ? h(GraphTab, { refreshKey: refreshKey }) : null,
 			tab === "cards" ? h(CardsTab, { onPendingChange: setPendingCount }) : null,
 			tab === "wiki" ? h(WikiTab, null) : null,
 			tab === "review" ? h(ReviewTab, { onPendingChange: setPendingCount }) : null,
@@ -393,7 +430,7 @@ function OverviewTab(props) {
 	var donutData = Object.keys(KIND_COLOR).map(function (k) { return { name: k, value: counts[k] || 0, color: KIND_COLOR[k] }; });
 	var maxStatus = Math.max(byStatus.active || 0, byStatus.archived || 0, 1);
 	var extractMode = (data.config && data.config.mode) || "main";
-	var usedRate = audit.inject_used_rate !== undefined ? (audit.inject_used_rate * 100).toFixed(0) + "%" : "—";
+	var usedRate = Number.isFinite(audit.inject_used_rate) ? (audit.inject_used_rate * 100).toFixed(0) + "%" : "—";
 	var wikiMax = Math.max(wiki.spec || 0, wiki.concept || 0, 1);
 
 	return h("div", null,
@@ -731,7 +768,7 @@ function AuditTab() {
 	if (loading) return h(Spinner, null);
 	if (!data) return null;
 	var s = data.summary || {};
-	var usedRate = s.inject_used_rate !== undefined ? (s.inject_used_rate * 100).toFixed(0) + "%" : "—";
+	var usedRate = Number.isFinite(s.inject_used_rate) ? (s.inject_used_rate * 100).toFixed(0) + "%" : "—";
 	var sparkData = (data.log || []).slice(-40).map(function (entry) { return entry.topic; });
 
 	return h("div", null,
@@ -758,6 +795,613 @@ function AuditTab() {
 				);
 			}),
 		toast.node
+	);
+}
+
+/* graph tab: Obsidian 式动态关系图谱（力导向 SVG，直接 DOM 操作） */
+// 低饱和现代色板：稳定质感，深浅主题下都清晰
+var GRAPH_KIND_COLOR = {
+	chain: "#8b7cf6", event: "#60a5fa",
+	lesson_pending: "#f59e0b", lesson_permanent: "#34d399", profile: "#f472b6",
+	"wiki:spec": "#818cf8", "wiki:concept": "#2dd4bf", "wiki:tutorial": "#fb923c"
+};
+var GRAPH_KIND_LABEL = {
+	chain: "事件链", event: "事件", lesson_pending: "经验·待审", lesson_permanent: "经验",
+	profile: "画像", "wiki:spec": "规范", "wiki:concept": "概念", "wiki:tutorial": "教程"
+};
+var EDGE_STYLE = {
+	belongs: { color: "rgba(148,163,184,0.55)", dash: "" },
+	entity: { color: "rgba(148,163,184,0.5)", dash: "4 4" },
+	supersedes: { color: "rgba(248,113,113,0.6)", dash: "2 3" },
+	parent: { color: "rgba(100,116,139,0.6)", dash: "6 3" }
+};
+var _svgNS = "http://www.w3.org/2000/svg";
+
+function GraphCanvas(props) {
+	var svgRef = useRef(null);
+	var gRef = useRef(null);
+	var tipRef = useRef(null);
+	var simRef = useRef(null);
+
+	useEffect(function () {
+		var svg = svgRef.current, g = gRef.current;
+		if (!svg || !g) return;
+		var nodes = props.nodes || [];
+		var edges = props.edges || [];
+		var prev = simRef.current;
+		var forceRandom = !prev || prev.layoutKey !== props.layoutKey;
+		var sim = {
+			pos: {}, k: 1, tx: 70, ty: 70, layoutKey: props.layoutKey,
+			raf: null, running: false, stableFrames: 0, temp: (prev && !forceRandom) ? prev.temp : 1, hardAny: false,
+			fitPending: forceRandom,
+			drag: null, pan: null, hoverId: null,
+			edgeEls: [], nodeEls: [], index: {}
+		};
+		simRef.current = sim;
+		sim.g = g;  // 模块级 applyTransform 需要 g 引用
+		var W = svg.clientWidth || 900, H = svg.clientHeight || 540;
+
+		// 聚类初始布局：链居中铺开，事件环绕其父链，其余螺旋（避免初始过挤引发斥力爆炸）；
+		// 重新布局时加随机角度偏移 → 每次生成不同形态（Obsidian 重排同款）
+		var jitter = forceRandom ? Math.random() * Math.PI * 2 : 0;
+		var chainIds = [];
+		nodes.forEach(function (n) { if (n.kind === "chain") chainIds.push(n.id); });
+		var parentOf = {};
+		edges.forEach(function (e) { if (e.kind === "belongs") parentOf[e.target] = e.source; });
+		var chainIndex = {};
+		chainIds.forEach(function (id, i) { chainIndex[id] = i; });
+		nodes.forEach(function (n) {
+			var old = !forceRandom && prev && prev.pos[n.id];
+			if (old) { sim.pos[n.id] = { x: old.x, y: old.y, vx: 0, vy: 0 }; return; }
+			if (n.kind === "chain") {
+				var ci = chainIndex[n.id] || 0;
+				var angC = ci * 2.399963 + 1 + jitter, radC = 80 + ci * 48;
+				sim.pos[n.id] = { x: W / 2 + Math.cos(angC) * radC, y: H / 2 + Math.sin(angC) * radC, vx: 0, vy: 0 };
+			}
+		});
+		var placed = 0, groupCount = {};
+		nodes.forEach(function (n) {
+			if (sim.pos[n.id]) return;
+			var par = parentOf[n.id];
+			if (par && sim.pos[par]) {
+				// 组内顺序黄金角 + 半径递增：同链事件卡均匀环绕，绝不重叠
+				var gi = groupCount[par] || 0;
+				groupCount[par] = gi + 1;
+				var angE = gi * 2.399963 + 1 + jitter;
+				var radE = 90 + gi * 42;
+				sim.pos[n.id] = { x: sim.pos[par].x + Math.cos(angE) * radE, y: sim.pos[par].y + Math.sin(angE) * radE, vx: 0, vy: 0 };
+			} else {
+				var ang = placed * 2.399963 + 1 + jitter, rad = 120 + placed * 34;
+				sim.pos[n.id] = { x: W / 2 + Math.cos(ang) * rad, y: H / 2 + Math.sin(ang) * rad, vx: 0, vy: 0 };
+			}
+			placed++;
+		});
+
+		g.innerHTML = "";
+		// 方向箭头 marker（fill: context-stroke → 箭头颜色跟随边颜色）
+		var defs = document.createElementNS(_svgNS, "defs");
+		var arrowMarker = document.createElementNS(_svgNS, "marker");
+		arrowMarker.setAttribute("id", "dmb-arrow");
+		arrowMarker.setAttribute("viewBox", "0 0 10 10");
+		arrowMarker.setAttribute("refX", "9");
+		arrowMarker.setAttribute("refY", "5");
+		arrowMarker.setAttribute("markerWidth", "7");
+		arrowMarker.setAttribute("markerHeight", "7");
+		arrowMarker.setAttribute("orient", "auto-start-reverse");
+		var arrowPath = document.createElementNS(_svgNS, "path");
+		arrowPath.setAttribute("d", "M0,0 L10,5 L0,10 z");
+		arrowPath.setAttribute("fill", "context-stroke");
+		arrowMarker.appendChild(arrowPath);
+		defs.appendChild(arrowMarker);
+		g.appendChild(defs);
+		var edgeG = document.createElementNS(_svgNS, "g");
+		var nodeG = document.createElementNS(_svgNS, "g");
+		g.appendChild(edgeG); g.appendChild(nodeG);
+
+		edges.forEach(function (e) {
+			if (!sim.pos[e.source] || !sim.pos[e.target]) return;
+			var st = EDGE_STYLE[e.kind] || EDGE_STYLE.belongs;
+			var line = document.createElementNS(_svgNS, "line");
+			line.setAttribute("stroke", st.color);
+			if (st.dash) line.setAttribute("stroke-dasharray", st.dash);
+			line.setAttribute("stroke-width", e.kind === "belongs" ? 1.2 : 1);
+			line.setAttribute("class", "dmb-graph-edge");
+			line.setAttribute("data-id", e.source + "~" + e.target);
+			// 有向边（归链=链→事件、版本=旧→新、上位=子→父）加方向箭头
+			if (e.kind !== "entity") line.setAttribute("marker-end", "url(#dmb-arrow)");
+			edgeG.appendChild(line);
+			sim.edgeEls.push({ line: line, e: e });
+		});
+
+		nodes.forEach(function (n) {
+			var el = document.createElementNS(_svgNS, "g");
+			el.setAttribute("class", "dmb-graph-node");
+			el.setAttribute("data-id", n.id);
+			var r = n.kind === "chain" ? 14 : (n.kind === "event" ? 8 : (n.kind.indexOf("wiki:") === 0 ? 9 : 7));
+			var circle = document.createElementNS(_svgNS, "circle");
+			circle.setAttribute("r", r);
+			circle.setAttribute("fill", GRAPH_KIND_COLOR[n.kind] || "var(--dmb-text3)");
+			var text = document.createElementNS(_svgNS, "text");
+			text.setAttribute("text-anchor", "middle");
+			text.setAttribute("dy", r + 14);
+			text.textContent = n.title.length > 16 ? n.title.slice(0, 15) + "…" : n.title;
+			el.appendChild(circle); el.appendChild(text);
+			nodeG.appendChild(el);
+			var item = { g: el, circle: circle, text: text, n: n, r: r };
+			sim.nodeEls.push(item);
+			sim.index[n.id] = item;
+			el.addEventListener("pointerdown", function (ev) {
+				ev.stopPropagation();
+				sim.drag = n.id;
+				var p = sim.pos[n.id];
+				p.vx = 0; p.vy = 0; p.fixed = true;
+				try { el.setPointerCapture(ev.pointerId); } catch (e) { /* no-op */ }
+				wake(sim);
+			});
+			el.addEventListener("pointerenter", function (ev) {
+				sim.hoverId = n.id;
+				showTip(sim, n, ev.clientX, ev.clientY);
+			});
+			el.addEventListener("pointerleave", function () {
+				sim.hoverId = null;
+				if (tipRef.current) tipRef.current.style.opacity = 0;
+			});
+			el.addEventListener("click", function () {
+				if (props.onSelect) props.onSelect(n.id);
+			});
+		});
+
+		function wake(s) {
+			if (s.running) return;
+			s.running = true;
+			s.stableFrames = 0;
+			s.raf = requestAnimationFrame(function step() {
+				tick(s, W, H);
+				if (!s.running) return;
+				s.raf = requestAnimationFrame(step);
+			});
+		}
+		wake(sim);
+
+		var onPointerMove = function (ev) {
+			var rect = svg.getBoundingClientRect();
+			var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+			if (sim.drag) {
+				var p = sim.pos[sim.drag];
+				p.x = (mx - sim.tx) / sim.k;
+				p.y = (my - sim.ty) / sim.k;
+				p.vx = 0; p.vy = 0;
+				applyPos(sim);
+			} else if (sim.pan) {
+				sim.tx = sim.pan.tx0 + (mx - sim.pan.x0);
+				sim.ty = sim.pan.ty0 + (my - sim.pan.y0);
+				// 位移超过阈值 → 视为平移（否则是空白点击，用于取消选中）
+				if (Math.abs(mx - sim.pan.x0) + Math.abs(my - sim.pan.y0) > 5) sim.pan.moved = true;
+				applyTransform(sim);
+			}
+			if (sim.hoverId && tipRef.current) {
+				showTip(sim, sim.index[sim.hoverId] && sim.index[sim.hoverId].n, ev.clientX, ev.clientY);
+			}
+		};
+		var onPointerDown = function (ev) {
+			if (ev.button !== 0 && ev.button !== undefined) return;
+			var rect = svg.getBoundingClientRect();
+			sim.pan = { x0: ev.clientX - rect.left, y0: ev.clientY - rect.top, tx0: sim.tx, ty0: sim.ty, moved: false };
+			svg.classList.add("panning");
+			try { svg.setPointerCapture(ev.pointerId); } catch (e) { /* no-op */ }
+		};
+		var onPointerUp = function () {
+			// 空白点击（无位移、未拖节点）→ 取消选中（Obsidian 行为）
+			var blankClick = !sim.drag && sim.pan && !sim.pan.moved;
+			if (sim.drag) {
+				var p = sim.pos[sim.drag];
+				if (p) p.fixed = false;
+				sim.drag = null;
+			}
+			sim.pan = null;
+			svg.classList.remove("panning");
+			wake(sim);
+			if (blankClick && props.onSelect) props.onSelect(null);
+		};
+		var onWheel = function (ev) {
+			ev.preventDefault();
+			var rect = svg.getBoundingClientRect();
+			var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+			var oldK = sim.k;
+			var newK = Math.max(0.15, Math.min(3.5, oldK * (ev.deltaY < 0 ? 1.12 : 0.89)));
+			sim.k = newK;
+			sim.tx = mx - ((mx - sim.tx) / oldK) * newK;
+			sim.ty = my - ((my - sim.ty) / oldK) * newK;
+			applyTransform(sim);
+		};
+		var onDblClick = function (ev) {
+			ev.preventDefault();
+			sim.k = 1; sim.tx = 70; sim.ty = 70;
+			applyTransform(sim);
+		};
+		svg.addEventListener("pointermove", onPointerMove);
+		svg.addEventListener("pointerdown", onPointerDown);
+		svg.addEventListener("pointerup", onPointerUp);
+		svg.addEventListener("wheel", onWheel, { passive: false });
+		svg.addEventListener("dblclick", onDblClick);
+
+		return function () {
+			sim.running = false;
+			if (sim.raf) cancelAnimationFrame(sim.raf);
+			svg.removeEventListener("pointermove", onPointerMove);
+			svg.removeEventListener("pointerdown", onPointerDown);
+			svg.removeEventListener("pointerup", onPointerUp);
+			svg.removeEventListener("wheel", onWheel);
+			svg.removeEventListener("dblclick", onDblClick);
+		};
+	}, [props.nodes, props.edges, props.layoutKey]);
+
+	// 选中高亮邻居（Obsidian 效果）
+	useEffect(function () {
+		var sim = simRef.current;
+		if (!sim || !sim.nodeEls) return;
+		var sel = props.selected;
+		var nbr = {};
+		if (sel) {
+			sim.edgeEls.forEach(function (item) {
+				var e = item.e;
+				if (e.source === sel) nbr[e.target] = 1;
+				if (e.target === sel) nbr[e.source] = 1;
+			});
+			nbr[sel] = 1;
+		}
+		sim.nodeEls.forEach(function (item) {
+			var dim = sel && !nbr[item.n.id];
+			item.g.setAttribute("class", "dmb-graph-node" + (item.n.id === sel ? " active" : ""));
+			item.circle.setAttribute("opacity", dim ? 0.18 : 1);
+			item.text.setAttribute("opacity", dim ? 0.12 : 1);
+			if (item.n.id === sel) item.circle.setAttribute("r", item.r + 4);
+			else item.circle.setAttribute("r", item.r);
+		});
+		sim.edgeEls.forEach(function (item) {
+			var e = item.e;
+			var lit = !sel || e.source === sel || e.target === sel;
+			item.line.setAttribute("opacity", lit ? 1 : 0.08);
+			// 选中节点的相邻边：虚线沿箭头方向动态流动
+			if (lit && sel) item.line.classList.add("lit");
+			else item.line.classList.remove("lit");
+		});
+	}, [props.selected]);
+
+	// applyTransform / applyPos 已提升为模块级（tick 需要调用；见 GraphCanvas 之后定义）
+
+	function showTip(sim, n, cx, cy) {
+		if (!tipRef.current || !n) return;
+		var rect = svgRef.current.getBoundingClientRect();
+		var tip = tipRef.current;
+		tip.innerHTML = "";
+		var t = document.createElement("div");
+		t.className = "t";
+		t.textContent = n.title;
+		var k = document.createElement("div");
+		k.className = "k";
+		k.textContent = GRAPH_KIND_LABEL[n.kind] || n.kind;
+		tip.appendChild(t); tip.appendChild(k);
+		tip.style.opacity = 1;
+		var tw = tip.offsetWidth, th = tip.offsetHeight;
+		var x = cx - rect.left + 14, y = cy - rect.top + 14;
+		if (x + tw > rect.width) x = cx - rect.left - tw - 10;
+		if (y + th > rect.height) y = cy - rect.top - th - 10;
+		tip.style.left = x + "px";
+		tip.style.top = y + "px";
+	}
+
+	return h("div", { className: "dmb-graph-wrap" },
+		h("svg", { className: "dmb-graph-svg", ref: svgRef }, h("g", { ref: gRef })),
+		h("div", { className: "dmb-graph-tip", ref: tipRef })
+	);
+}
+
+/* 模块级 DOM 应用 + 整体适配（tick 与组件事件共用） */
+function applyTransform(sim) {
+	var g = sim.g;
+	if (g) g.setAttribute("transform", "translate(" + sim.tx.toFixed(1) + "," + sim.ty.toFixed(1) + ") scale(" + sim.k.toFixed(3) + ")");
+}
+function applyPos(sim) {
+	sim.nodeEls.forEach(function (item) {
+		var p = sim.pos[item.n.id];
+		if (p) item.g.setAttribute("transform", "translate(" + p.x.toFixed(1) + "," + p.y.toFixed(1) + ")");
+	});
+	sim.edgeEls.forEach(function (item) {
+		var a = sim.pos[item.e.source], b = sim.pos[item.e.target];
+		if (a && b) {
+			item.line.setAttribute("x1", a.x.toFixed(1));
+			item.line.setAttribute("y1", a.y.toFixed(1));
+			item.line.setAttribute("x2", b.x.toFixed(1));
+			item.line.setAttribute("y2", b.y.toFixed(1));
+		}
+	});
+}
+function doFit(sim, W, H) {
+	// 整体形态约束：布局冻结后自动缩放平移，使全部节点完整可见并居中（留边距）
+	var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	Object.keys(sim.pos).forEach(function (id) {
+		var p = sim.pos[id];
+		if (p.x < minX) minX = p.x;
+		if (p.y < minY) minY = p.y;
+		if (p.x > maxX) maxX = p.x;
+		if (p.y > maxY) maxY = p.y;
+	});
+	var bw = Math.max(maxX - minX, 60), bh = Math.max(maxY - minY, 60);
+	var k = Math.min((W - 90) / bw, (H - 90) / bh, 1.6);
+	if (k < 0.12) k = 0.12;
+	if (k > 1) k = 1;  // 图小于画布时不放大
+	sim.k = k;
+	var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+	sim.tx = W / 2 - cx * k;
+	sim.ty = H / 2 - cy * k;
+}
+
+function tick(sim, W, H) {
+	var ids = Object.keys(sim.pos);
+	var n = ids.length;
+	if (n === 0) { sim.running = false; return; }
+	var arr = ids.map(function (id) { return sim.pos[id]; });
+	// 温度：拖拽时**平滑升温**（lerp 至 0.5，避免第一次拖动瞬间解冻导致整图跳动）；
+	// 硬重叠未解决前不冻结（温度维持 0.25 继续推开，直到彻底分离）
+	if (sim.drag) sim.temp = Math.min(1, sim.temp + (0.5 - sim.temp) * 0.06);
+	else sim.temp *= 0.965;
+	if (sim.hardAny) sim.temp = Math.max(sim.temp, 0.25);
+	if (sim.temp < 0.04) {
+		sim.running = false;
+		// 初始/重新布局冻结后自动适配画布（整体形态约束：图完整可见、居中）
+		if (sim.fitPending) {
+			sim.fitPending = false;
+			doFit(sim, W, H);
+			applyTransform(sim);
+		}
+		applyPos(sim);
+		return;
+	}
+	var K = 90;
+	// 每帧合力清零（_id 用于同点方向退化；kind 用于链骨架引力）
+	for (var i = 0; i < n; i++) {
+		var idx = sim.index[ids[i]];
+		arr[i]._id = ids[i];
+		arr[i].kind = idx ? idx.n.kind : "";
+		arr[i].fx = 0; arr[i].fy = 0; arr[i].hard = 0;
+	}
+	// 斥力 fr = K²/d（clamp 上限）+ 硬性防重叠（d<34 强推开，穿透温度冷却）
+	for (var i = 0; i < n; i++) {
+		var a = arr[i];
+		for (var j = i + 1; j < n; j++) {
+			var b = arr[j];
+			var dx = a.x - b.x, dy = a.y - b.y;
+			var d2 = dx * dx + dy * dy;
+			var d = Math.sqrt(d2) || 1;
+			if (dx === 0 && dy === 0) {
+				// 完全同点：合力方向退化 → 按 id 哈希给固定方向，保证可推开
+				var h = 0;
+				for (var c = 0; c < a._id.length; c++) h = (h * 31 + a._id.charCodeAt(c)) >>> 0;
+				var angZ = ((h % 360) * Math.PI) / 180;
+				dx = Math.cos(angZ); dy = Math.sin(angZ);
+				d = 1;
+			}
+			var hard = d < 34 ? (34 - d) * 0.45 : 0;
+			// 斥力随距离 d² 衰减（近距有限、远距趋零）：节点簇平衡后不再互相推开
+			var f = 30000 / (d * d) + hard;
+			if (f > 2.5) f = 2.5;
+			if (hard > f) f = hard;
+			var fx = (dx / d) * f, fy = (dy / d) * f;
+			// 斥力：a 沿 dx 方向（远离 b），b 反向（远离 a）
+			if (!a.fixed) { a.fx += fx; a.fy += fy; if (hard > a.hard) a.hard = hard; }
+			if (!b.fixed) { b.fx -= fx; b.fy -= fy; if (hard > b.hard) b.hard = hard; }
+		}
+	}
+	// 弹簧（线性，平衡于 rest 附近）
+	sim.edgeEls.forEach(function (item) {
+		var a = sim.pos[item.e.source], b = sim.pos[item.e.target];
+		if (!a || !b) return;
+		var dx = b.x - a.x, dy = b.y - a.y;
+		var d = Math.sqrt(dx * dx + dy * dy) || 1;
+		var rest = item.e.kind === "parent" ? 170 : (item.e.kind === "belongs" ? 110 : 100);
+		var f = 0.05 * (d - rest);
+		var fx = (dx / d) * f, fy = (dy / d) * f;
+		if (!a.fixed) { a.fx += fx; a.fy += fy; }
+		if (!b.fixed) { b.fx -= fx; b.fy -= fy; }
+	});
+	// 弱向心力（每节点，d3 forceX/forceY 同款）：与斥力形成平衡点 → 整体呈圆形聚合（Obsidian 观感）
+	for (var i2 = 0; i2 < n; i2++) {
+		var a2 = arr[i2];
+		if (a2.fixed) continue;
+		a2.fx += (W / 2 - a2.x) * 0.007;
+		a2.fy += (H / 2 - a2.y) * 0.007;
+	}
+	// 质心轻居中（Obsidian/d3 forceCenter 同款：整体平移，不改变节点相对位置 → 不会压缩成团）
+	var cx = 0, cy = 0;
+	for (var i5 = 0; i5 < n; i5++) { cx += arr[i5].x; cy += arr[i5].y; }
+	cx /= n; cy /= n;
+	for (var i6 = 0; i6 < n; i6++) {
+		var a6 = arr[i6];
+		if (a6.fixed) continue;
+		a6.x += (W / 2 - cx) * 0.08;
+		a6.y += (H / 2 - cy) * 0.08;
+	}
+	// 积分：位移 = 合力方向 × min(合力, 2.5) × 温度（无速度累积 → 无爆发）；
+	// 硬重叠时位移不低于 min(hard, 3)，保证即使温度已冷却也必然分开
+	var maxMove = 0, hardAny = false;
+	for (var i3 = 0; i3 < n; i3++) {
+		var p = arr[i3];
+		if (p.fixed) continue;
+		if (p.hard > 0.5) hardAny = true;
+		var mag = Math.sqrt(p.fx * p.fx + p.fy * p.fy);
+		if (mag <= 0) continue;
+		var step = Math.min(mag, 2.5) * sim.temp;
+		if (p.hard > 0) {
+			var hs = Math.min(p.hard, 3);
+			if (hs > step) step = hs;
+		}
+		p.x += (p.fx / mag) * step;
+		p.y += (p.fy / mag) * step;
+		if (step > maxMove) maxMove = step;
+	}
+	sim.hardAny = hardAny;
+	// DOM 应用
+	sim.nodeEls.forEach(function (item) {
+		var p = sim.pos[item.n.id];
+		if (p) item.g.setAttribute("transform", "translate(" + p.x.toFixed(1) + "," + p.y.toFixed(1) + ")");
+	});
+	sim.edgeEls.forEach(function (item) {
+		var a = sim.pos[item.e.source], b = sim.pos[item.e.target];
+		if (a && b) {
+			item.line.setAttribute("x1", a.x.toFixed(1));
+			item.line.setAttribute("y1", a.y.toFixed(1));
+			item.line.setAttribute("x2", b.x.toFixed(1));
+			item.line.setAttribute("y2", b.y.toFixed(1));
+		}
+	});
+	if (sim.drag) {
+		sim.stableFrames = 0;
+	} else if (maxMove < 0.3) {
+		sim.stableFrames++;
+		if (sim.stableFrames > 40) { sim.running = false; return; }
+	} else {
+		sim.stableFrames = 0;
+	}
+}
+
+function GraphTab(props) {
+	var _g0 = useState(null), data = _g0[0], setData = _g0[1];
+	var _g1 = useState(true), loading = _g1[0], setLoading = _g1[1];
+	var _g2 = useState(null), selected = _g2[0], setSelected = _g2[1];
+	var _g3 = useState(true), showWiki = _g3[0], setShowWiki = _g3[1];
+	var _g4 = useState(true), showEntity = _g4[0], setShowEntity = _g4[1];
+	var _g5 = useState(0), layoutKey = _g5[0], setLayoutKey = _g5[1];
+	var _g6 = useState(null), detail = _g6[0], setDetail = _g6[1];
+
+	var load = useCallback(function () {
+		setLoading(true);
+		api.get("graph").then(function (d) {
+			setData(d); setSelected(null); setDetail(null);
+		}).catch(function (err) {
+			setData({ error: String((err && err.message) || err) });
+		}).finally(function () { setLoading(false); });
+	}, []);
+	useEffect(function () { load(); }, [load, props.refreshKey]);
+
+	var nodes = useMemo(function () {
+		if (!data || !data.nodes) return [];
+		return data.nodes.filter(function (n) {
+			return !(n.kind.indexOf("wiki:") === 0 && !showWiki);
+		});
+	}, [data, showWiki]);
+
+	var edges = useMemo(function () {
+		if (!data || !data.edges) return [];
+		var keep = {};
+		nodes.forEach(function (n) { keep[n.id] = 1; });
+		return data.edges.filter(function (e) {
+			if (e.kind === "entity" && !showEntity) return false;
+			return keep[e.source] && keep[e.target];
+		});
+	}, [data, showEntity, nodes]);
+
+	// 选中节点被过滤掉 → 清空
+	useEffect(function () {
+		if (!selected) return;
+		for (var i = 0; i < nodes.length; i++) {
+			if (nodes[i].id === selected) return;
+		}
+		setSelected(null);
+	}, [nodes, selected]);
+
+	// 选中 → 拉详情
+	useEffect(function () {
+		if (!selected || !data) { setDetail(null); return; }
+		var node = null;
+		for (var i = 0; i < data.nodes.length; i++) {
+			if (data.nodes[i].id === selected) { node = data.nodes[i]; break; }
+		}
+		if (!node) { setDetail(null); return; }
+		if (node.kind.indexOf("wiki:") === 0) {
+			setDetail({ node: node, card: null });
+			return;
+		}
+		setDetail(null);
+		var stale = false;
+		api.get("card", { id: selected }).then(function (d) {
+			if (!stale) setDetail({ node: node, card: d.card });
+		}).catch(function () {
+			if (!stale) setDetail({ node: node, card: null });
+		});
+		return function () { stale = true; };
+	}, [selected, data]);
+
+	var neigh = useMemo(function () {
+		if (!selected || !data) return [];
+		var out = [];
+		(data.edges || []).forEach(function (e) {
+			var other = null;
+			if (e.source === selected) other = e.target;
+			else if (e.target === selected) other = e.source;
+			if (!other) return;
+			for (var i = 0; i < data.nodes.length; i++) {
+				if (data.nodes[i].id === other) {
+					out.push({ id: other, title: data.nodes[i].title, kind: data.nodes[i].kind, edge: e.kind });
+					break;
+				}
+			}
+		});
+		return out;
+	}, [selected, data]);
+
+	if (loading && !data) return h("div", { className: "dmb-empty" }, h("div", { className: "dmb-spinner" }));
+	if (data && data.error) return h("div", { className: "dmb-empty" }, "图谱加载失败：" + data.error);
+	if (!data) return null;
+
+	var counts = data.counts || {};
+	var legend = Object.keys(GRAPH_KIND_COLOR).map(function (k) {
+		return h("span", { key: k }, h("i", { style: { background: GRAPH_KIND_COLOR[k] } }), GRAPH_KIND_LABEL[k] || k);
+	});
+
+	var side = null;
+	if (detail) {
+		var node = detail.node;
+		var rows = [];
+		var pushRow = function (k, v) { if (v !== undefined && v !== null && v !== "") rows.push(h("div", { key: k }, h("span", { className: "k" }, k), h("span", { className: "v" }, String(v)))); };
+		pushRow("创建", (node.created_at || "").slice(0, 19));
+		pushRow("更新", (node.updated_at || "").slice(0, 19));
+		pushRow("置信", node.confidence);
+		pushRow("证据", node.evidence);
+		pushRow("状态", node.status);
+		pushRow("路径", node.source_path);
+		if (detail.card) {
+			pushRow("来源", detail.card.sourcePart);
+			pushRow("链", detail.card.chainTitle || "");
+			if (detail.card.content) rows.push(h("div", { key: "content", style: { gridColumn: "1 / -1" } }, h("span", { className: "k" }, "内容"), h("span", { className: "v" }, detail.card.content)));
+		}
+		side = h("div", { className: "dmb-graph-side" },
+			h("h4", null,
+				h("span", { className: "dmb-kind " + node.kind.replace(":", "-") }, GRAPH_KIND_LABEL[node.kind] || node.kind),
+				node.title),
+			h("div", { className: "meta" }, rows),
+			neigh.length > 0 ? h("div", { className: "neigh" }, neigh.map(function (nb) {
+				return h("span", { key: nb.id, onClick: function () { setSelected(nb.id); } },
+					nb.title, h("b", null, "·" + (nb.edge === "belongs" ? "归链" : nb.edge === "entity" ? "实体" : nb.edge === "supersedes" ? "版本" : "上位")));
+			})) : null,
+			h("div", { className: "dmb-actions" },
+				h("button", { className: "dmb-btn", onClick: function () { setSelected(null); } }, "取消选中"),
+				h("button", { className: "dmb-btn", onClick: function () { setDetail(null); setSelected(null); } }, "关闭"))
+		);
+	}
+
+	return h("div", { className: "dmb-fade" },
+		h("div", { className: "dmb-graph-toolbar" },
+			h("span", { className: "dmb-hint" }, "共 " + counts.cards + " 卡 · " + counts.chains + " 链 · " + counts.wiki + " 知识 · " + counts.edges + " 关联"),
+			h("div", { className: "grow" }),
+			h("label", { className: "dmb-check" }, h("input", { type: "checkbox", checked: showWiki, onChange: function (e) { setShowWiki(e.target.checked); } }), "知识库"),
+			h("label", { className: "dmb-check" }, h("input", { type: "checkbox", checked: showEntity, onChange: function (e) { setShowEntity(e.target.checked); } }), "实体关联"),
+			h("button", { className: "dmb-btn", onClick: function () { setLayoutKey(function (k) { return k + 1; }); }, title: "重新随机布局" }, "重新布局")
+		),
+		h(GraphCanvas, { nodes: nodes, edges: edges, selected: selected, onSelect: setSelected, layoutKey: layoutKey }),
+		h("div", { className: "dmb-graph-legend" }, legend),
+		side,
+		h("div", { className: "dmb-hint", style: { marginTop: 8 } }, "拖拽节点移动 · 滚轮缩放 · 空白拖拽平移 · 点击节点高亮关联 · 双击复位")
 	);
 }
 

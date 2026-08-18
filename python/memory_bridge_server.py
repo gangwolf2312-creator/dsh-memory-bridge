@@ -12,11 +12,12 @@ no pip installs. Bridge configuration is a plain JSON file the UI edits through
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
 import threading
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,8 @@ def ensure_engine() -> dict[str, Any]:
         import jieba  # noqa: F401  (bundled pure-python package)
         import memory as mem
         from memory.audit import audit_summary
+        from memory.extract import MemoryWritePipeline
+        from memory.injector import MemoryInjector
         from memory.lemonade import LemonadeManager
         from memory.search import MemorySearch
         from memory.store import MemoryStore
@@ -127,6 +130,9 @@ def ensure_engine() -> dict[str, Any]:
         search = MemorySearch(store)
         wiki_search = WikiSearch(wiki_store)
         lemonade = LemonadeManager()
+        # 崩溃/重启对账：遗留 extracting 认领回滚为 staged（引擎管道只认 staged/failed）
+        with contextlib.suppress(Exception):
+            store._exec("UPDATE runs SET status = 'staged' WHERE status = 'extracting'")
         _engine = {
             "mem": mem,
             "store": store,
@@ -134,6 +140,8 @@ def ensure_engine() -> dict[str, Any]:
             "search": search,
             "wiki_search": wiki_search,
             "lemonade": lemonade,
+            "injector": MemoryInjector(search),
+            "pipeline_cls": MemoryWritePipeline,
             "memory_root": str(memory_root),
             "wiki_root": str(wiki_root),
             "engine_root": str(root),
@@ -178,6 +186,50 @@ def _card_payload(card) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# 提取管道缓存：engine 的 MemoryWritePipeline 自带门卫/归链/冲突裁决/知识管道/
+# 失败退避上限，sidecar 只负责装配与调用。管道（含提取器）按配置指纹缓存，
+# 复用实例才让云端限流/成本记账持续生效（每调用重建会把 10 次/分限流清零）。
+# ---------------------------------------------------------------------------
+
+_pipeline_cache: dict[str, Any] = {}
+
+
+def _config_fingerprint(cfg: dict[str, Any]) -> str:
+    c = cfg.get("cloud", {})
+    l = cfg.get("local", {})
+    return json.dumps(
+        {
+            "mode": cfg.get("mode"),
+            "cloud": (c.get("baseUrl"), c.get("model")),
+            "local": (l.get("baseUrl"), l.get("model"), l.get("preset")),
+        },
+        sort_keys=True,
+    )
+
+
+def get_pipeline(eng: dict[str, Any]) -> Any:
+    """按当前配置取（缓存）提取管道；off/未配置返回 None。"""
+    cfg = load_config()
+    fp = _config_fingerprint(cfg)
+    pipe = _pipeline_cache.get(fp)
+    if pipe is not None:
+        return pipe
+    extractor = eng["mem"].build_extractor(to_extract_config(cfg))
+    if extractor is None:
+        return None
+    pipe = eng["pipeline_cls"](
+        eng["store"],
+        extractor=extractor,
+        wiki_store=eng["wiki_store"],
+        enabled=True,
+        worker=False,
+    )
+    _pipeline_cache.clear()
+    _pipeline_cache[fp] = pipe
+    return pipe
+
+
+# ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
 
@@ -209,9 +261,9 @@ def rpc_overview(_params: dict[str, Any] | None = None) -> dict[str, Any]:
         by_status[status] = store.count_cards(status=status)
     wiki_counts: dict[str, int] = {}
     for kind in ("spec", "concept", "tutorial"):
-            sum(
-                1 for e in eng["wiki_store"].all_entries() if e.kind == kind
-            )
+        wiki_counts[kind] = sum(
+            1 for e in eng["wiki_store"].all_entries() if e.kind == kind
+        )
     lemonade = _lemonade_payload()
     return {
         "memoryRoot": eng["memory_root"],
@@ -361,6 +413,14 @@ def rpc_add_run(params: dict[str, Any]) -> dict[str, Any]:
         priority=int(params.get("priority", 0)),
     )
     store.insert_run(run)
+    # §9.7 门卫粗筛（与引擎 enqueue 同口径）：寒暄/无事实信号 → 落盘但跳过提取
+    with contextlib.suppress(Exception):
+        from memory.guard import should_extract
+
+        worth, reason = should_extract(user_text, reply_text)
+        if not worth:
+            store.mark_run(run.run_id, "skipped", reason)
+            store.log_decision("extract_skip", f"{run.run_id}: {reason}")
     return {"ok": True, "runId": run.run_id}
 
 
@@ -464,6 +524,7 @@ def rpc_config_set(params: dict[str, Any]) -> dict[str, Any]:
         _config.clear()
         _config.update(merged)
         save_config()
+    _pipeline_cache.clear()  # 配置变更 → 下个 extract 重建提取管道
     return {"ok": True, "config": masked_config()}
 
 
@@ -477,28 +538,19 @@ def rpc_extract(params: dict[str, Any]) -> dict[str, Any]:
             "mode": mode,
             "note": "off=纯规则零调用；main=主对话模型提取需在 DSH 会话内接线（P1），此界面仅展示状态",
         }
-    extractor = eng["mem"].build_extractor(to_extract_config(cfg))
-    if extractor is None:
+    pipe = get_pipeline(eng)
+    if pipe is None:
         return {"ok": True, "mode": mode, "note": "extractor disabled"}
-    run_ids = params.get("runIds") or []
-    store = eng["store"]
-    done: list[dict[str, Any]] = []
-    for run_id in run_ids:
-        run = store.next_staged_run()
-        if run is None or (run_ids and run.run_id != run_id):
-            if run is not None:
-                store.mark_run(run.run_id, "staged")
-            continue
-        try:
-            cards = extractor.extract_run(run)
-            for card in cards:
-                store.write_card(card)
-            store.mark_run(run.run_id, "done")
-            done.append({"runId": run.run_id, "cards": len(cards)})
-        except Exception as exc:
-            store.mark_run(run.run_id, "failed", str(exc))
-            done.append({"runId": run.run_id, "error": str(exc)})
-    return {"ok": True, "mode": mode, "extracted": done}
+    # 清空积压：process_staged 按 batch_size 取量（云端攒批），循环至空；
+    # 门卫/归链/冲突裁决/知识管道/失败退避上限全部由引擎管道处理。
+    # runIds 参数保留兼容（无调用方依赖），实际以队列为准。
+    total = 0
+    while True:
+        n = pipe.process_staged(limit=None)
+        if n <= 0:
+            break
+        total += n
+    return {"ok": True, "mode": mode, "extracted": total, "processed": total}
 
 
 def rpc_audit(_params: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -506,6 +558,160 @@ def rpc_audit(_params: dict[str, Any] | None = None) -> dict[str, Any]:
     store = eng["store"]
     rows = store.decision_log()
     return {"summary": eng["audit_summary"](store), "log": list(reversed(rows[-200:]))}
+
+
+def rpc_graph(_params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """关系图谱数据：节点=卡/链/wiki 条目，边=归链/版本/上位规划/共享实体。
+
+    前端据此渲染 Obsidian 式力导向图。全部读操作，无写入。
+    """
+    eng = ensure_engine()
+    store = eng["store"]
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    by_id: dict[str, dict[str, Any]] = {}
+    seen_edges: set[tuple[str, str, str]] = set()
+
+    def add_node(nid: str, kind: str, title: str, weight: float = 1.0, **extra: Any) -> None:
+        if nid in by_id:
+            return
+        node = {"id": nid, "kind": kind, "title": title, "weight": round(float(weight), 3)}
+        if extra:
+            node.update(extra)
+        by_id[nid] = node
+        nodes.append(node)
+
+    def add_edge(src: str, dst: str, kind: str) -> None:
+        if src == dst or src not in by_id or dst not in by_id:
+            return
+        key = (src, dst, kind)
+        if key in seen_edges:
+            return
+        seen_edges.add(key)
+        edges.append({"source": src, "target": dst, "kind": kind})
+
+    # 1) 记忆卡（含链卡）：节点
+    for c in store.active_cards():
+        add_node(c.id, c.kind, c.title, weight=c.confidence or 1.0,
+                 created_at=c.created_at, updated_at=c.updated_at,
+                 source_path=c.source_path, evidence=c.evidence)
+
+    # 2) 归链边：链 → 叶（parent_id 单向，链卡 children 冗余不重复加）
+    for c in store.active_cards():
+        if c.parent_id:
+            add_edge(c.parent_id, c.id, "belongs")
+
+    # 3) 版本链：supersedes / superseded_by（字段可能是 id 或标题，都尝试匹配）
+    title_to_id = {n["title"]: n["id"] for n in nodes}
+    for c in store.active_cards():
+        for field, direction in (("supersedes", "out"), ("superseded_by", "in")):
+            ref = getattr(c, field, "")
+            target = by_id.get(ref) or title_to_id.get(ref)
+            if target:
+                if direction == "out":
+                    add_edge(c.id, target, "supersedes")
+                else:
+                    add_edge(target, c.id, "supersedes")
+
+    # 4) wiki 条目：节点 + 上位规划/版本边
+    with contextlib.suppress(Exception):
+        entries = list(eng["wiki_store"].all_entries())
+        wiki_titles: dict[str, str] = {}
+        for e in entries:
+            add_node(e.id, f"wiki:{e.kind}", e.title, weight=e.confidence or 1.0,
+                     status=e.status, created_at=e.created_at,
+                     source_path=e.source_path, evidence=e.evidence)
+            wiki_titles[e.title] = e.id
+        for e in entries:
+            if e.parent_ref:
+                add_edge(e.id, by_id.get(e.parent_ref) or wiki_titles.get(e.parent_ref) or e.parent_ref, "parent")
+            for field, direction in (("supersedes", "out"), ("superseded_by", "in")):
+                ref = getattr(e, field, "")
+                target = by_id.get(ref) or wiki_titles.get(ref)
+                if target:
+                    if direction == "out":
+                        add_edge(e.id, target, "supersedes")
+                    else:
+                        add_edge(target, e.id, "supersedes")
+
+    # 5) 跨卡共享实体：弱关联（星型连法限量，避免全连通爆炸）
+    from collections import defaultdict
+
+    ent_cards: dict[str, list[str]] = defaultdict(list)
+    for c in store.active_cards():
+        if c.kind == "chain":
+            continue  # 链实体与叶实体天然重叠，跳过避免冗余
+        for ent in c.entities:
+            ent_cards[ent].append(c.id)
+    entity_edges = 0
+    for ids in ent_cards.values():
+        if len(ids) < 2:
+            continue
+        ids = ids[:8]
+        for other in ids[1:]:
+            add_edge(ids[0], other, "entity")
+            entity_edges += 1
+            if entity_edges >= 300:
+                break
+        if entity_edges >= 300:
+            break
+
+    counts = {
+        "cards": sum(1 for n in nodes if not n["kind"].startswith("wiki:")),
+        "chains": sum(1 for n in nodes if n["kind"] == "chain"),
+        "wiki": sum(1 for n in nodes if n["kind"].startswith("wiki:")),
+        "edges": len(edges),
+    }
+    return {"nodes": nodes, "edges": edges, "counts": counts}
+
+
+# ---------------------------------------------------------------------------
+# 拉式记忆注入（读取端）：host 在 user/message 时预取检索 → 缓存本会话最近
+# 注入结果；system prompt 渲染时同步取文本；turn 结束后回传审计闭环。
+# ---------------------------------------------------------------------------
+
+_inject_cache: dict[str, list] = {}  # session_id -> list[SearchResult]（最近注入）
+
+
+def rpc_inject(params: dict[str, Any]) -> dict[str, Any]:
+    """按用户消息检索相关记忆，返回带溯源的注入文本（L2 档 ≤3 条，50ms 超时）。"""
+    eng = ensure_engine()
+    query = str(params.get("query", "")).strip()[:2000]
+    if not query:
+        return {"text": "", "cards": [], "count": 0}
+    session_id = str(params.get("sessionId", ""))
+    tier = str(params.get("tier", "L2"))
+    inj = eng["injector"]
+    results = inj.inject_for_tier(tier, query)
+    if session_id:
+        _inject_cache[session_id] = results
+    text = "\n".join(inj.format_result(r) for r in results)
+    return {
+        "text": text,
+        "cards": [
+            {
+                "cardId": r.card_id,
+                "title": r.title,
+                "snippet": r.snippet,
+                "chainTitle": r.chain_title,
+                "chainId": r.chain_id,
+            }
+            for r in results
+        ],
+        "count": len(results),
+    }
+
+
+def rpc_record_usage(params: dict[str, Any]) -> dict[str, Any]:
+    """审计闭环：判定模型回复是否利用了注入记忆（inject_used 落 decision_log）。"""
+    eng = ensure_engine()
+    session_id = str(params.get("sessionId", ""))
+    reply = str(params.get("replyText", ""))
+    results = _inject_cache.pop(session_id, [])
+    if not results or not reply.strip():
+        return {"ok": True, "usage": {}}
+    usage = eng["injector"].record_usage(results, reply)
+    return {"ok": True, "usage": usage}
 
 
 # ---------------------------------------------------------------------------
@@ -528,6 +734,9 @@ METHODS: dict[str, Any] = {
     "configSet": rpc_config_set,
     "extract": rpc_extract,
     "audit": rpc_audit,
+    "graph": rpc_graph,
+    "inject": rpc_inject,
+    "recordUsage": rpc_record_usage,
 }
 
 
