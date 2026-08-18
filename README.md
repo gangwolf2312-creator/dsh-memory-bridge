@@ -73,12 +73,23 @@ dsh plugin --profile web remove dsh-memory-bridge
 | 待审 | 提取队列 / pending 经验审批 |
 | 审计 | 注入/提取统计 + 「立即维护」按钮（手动衰减+治理）+ 决策日志 |
 
+## 界面预览
+
+> 设置页 → 记忆（`/settings` 内）。截图来自真实运行实例（事件 147 / 链 34 / 注入利用率 93%）。
+
+| | |
+|---|---|
+| **总览**：统计卡片 / 记忆构成环形图 / 本地推理状态 / 提取注入审计 / 提取配置表单 | **事件图谱**：力导向图（方向箭头、链着色）+ 下方记忆树联动导航 |
+| ![总览](docs/screenshots/overview.png) | ![事件图谱](docs/screenshots/event-graph.png) |
+| **知识图谱**：wiki 条目力导向图（上位/版本关系）+ 搜索 + 条目列表 | **时间线**：事件流按日分组（今天/昨天/2-6 天前），时间倒序 |
+| ![知识图谱](docs/screenshots/wiki-graph.png) | ![时间线](docs/screenshots/timeline.png) |
+
 ## Agent 工具
 
 | 工具 | 用途 |
 |---|---|
 | `memory_search` | BM25+RRF 确定性检索记忆卡，零 LLM、零网络；返回链上下文与反馈信号提示 |
-| `memory_add_run` | 显式把一轮对话写入记忆 run 队列（之后由 rules/LLM 提取决定是否成卡） |
+| `memory_add_run` | 由 agent 在对话中主动调用（如用户要求记住某事、或判断本轮有持久价值）：把传入的 userText（取自 harness 会话原文）写入 run 队列，之后由 rules/LLM 提取决定是否成卡；可指定 tier 优先级 |
 | `memory_review` | 查看待提取 run 队列 / 指定 run 状态，用于审计 |
 
 ## HTTP API（浏览器代理，host 转发到 sidecar）

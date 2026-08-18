@@ -36,5 +36,5 @@
     "./config.example.json": "./config.example.json",
     "./package.json": "./package.json"
   },
-  "files": ["lib", "client", "python", "engine", "cordis.patch.yml", "config.example.json", "README.md"]
+  "files": ["lib", "client", "python", "engine", "docs", "cordis.patch.yml", "config.example.json", "README.md"]
 }
