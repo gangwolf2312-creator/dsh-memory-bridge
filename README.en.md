@@ -137,7 +137,7 @@ DeepSeek Harness (host plugin process)
 
 ### Write pipeline (dual channel)
 
-1. **LLM extraction** (auto on turn/end): incrementally scan this turn's user+assistant text → enqueue into `runs` → gate `should_extract` (zero-LLM; chit-chat turns marked `skipped` to save calls) → LLM extraction → events/lessons/knowledge routed and stored → chain attribution → conflict resolution → backoff on failure. JSON output has truncation tolerance (fix quotes/commas/closing brackets).
+1. **LLM extraction** (auto on turn/end): incrementally scan this turn's user+assistant text → enqueue into `runs` → gate `should_extract` (zero-LLM; chit-chat turns marked `skipped` to save calls) → LLM extraction → events/lessons/knowledge routed and stored → chain attribution → conflict resolution → backoff on failure. JSON output has truncation tolerance (fix quotes/commas/closing brackets); **truncation downgrade** (v0.3 rescue): `finish_reason=length` or JSON needing structural repair forces `evidence=uncertain` on that batch → cards become `lesson_pending` / wiki entries `pending` (review), truncated content never auto-solidifies (previously the repairer masked incomplete content); single-card `max_tokens` raised 1024 → 2048.
 2. **Zero-LLM rule recorder** (instant on user/message, pure rules, doesn't steal TTFT):
    - "记住教训/踩坑/经验教训" → **lesson_permanent immediately** (permanent lesson)
    - "记住/记下/别忘了" → event card immediately
@@ -145,7 +145,7 @@ DeepSeek Harness (host plugin process)
 
 ### Read pipeline (injection + audit loop)
 
-- **user/message prefetch**: retrieve relevant memories (L2 ≤3 / L1 ≤1 / greetings L0 zero-inject, 50ms timeout — better none than late) + **resident baseline snapshot** (approved profile + high-confidence permanent lessons, digest change detection, KV-cache friendly) → cache → injected into system prompt render with provenance text
+- **user/message prefetch**: intent tiers (L2 ≤3 / L1 ≤1 / greetings L0 zero-inject — greetings judged by **whole-utterance approximate match** so real questions containing "好/行/嗯" are not misjudged; 50ms timeout — better none than late) + **fact-card priority** (v0.3 rescue: lessons/permanent/preference cards get a supplementary token-overlap lookup and are injected ahead of event streams, which only fill remaining slots — prevents the multi-column RRF from squeezing zero-usage fact cards out) + **resident baseline snapshot** (approved profile + high-confidence permanent lessons, **relevance gate**: without identity/preference/experience-type words in the query the profile/lessons are not injected, preventing off-topic noise; digest change detection, KV-cache friendly) → cache → injected into system prompt render with provenance text
 - **Audit loop**: after turn end, judge whether injected memory was actually used in the reply (rule-based attribution, zero-LLM) → hit rolls / ≥3 consecutive misses fade weight ("not used" ≠ "memory wrong")
 
 ### Lifecycle governance (rule-driven, zero-LLM)
@@ -157,7 +157,7 @@ DeepSeek Harness (host plugin process)
 ### Profile distillation
 
 - Manual trigger (Profile tab or RPC `distill`): collect event tree → LLM generates profile summary + user personality dimensions (MBTI + 8 axes, profile data not a persona library) → debounce/dedup → draft → **human approval** solidifies (version+1, draft moved to `approved/` to prevent repeat approval) → enters the injection resident baseline
-- Profile = resident injected user profile info: each turn's system prompt carries the profile summary (identity/preferences/collaboration style) as stable user background
+- Profile = user profile info (identity/preferences/collaboration style) as stable model background; **relevance gate** (v0.3 rescue): injected with the resident baseline only when the query contains identity/preference/experience-type words — off-topic and greeting turns carry no profile
 
 ### Engineering safeguards
 

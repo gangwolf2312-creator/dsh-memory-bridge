@@ -15,6 +15,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import sys
 import threading
 from dataclasses import asdict, replace
@@ -1012,7 +1013,15 @@ def _dedup_inject(results: list) -> list:
 
 
 def _inject_tier(text: str) -> str:
-    """注入档位自动判定：指令/计划/目标 → L2(≤3 条)；一般消息 → L1(≤1 条)；寒暄 → L0(不注入省 token)。"""
+    """注入档位自动判定：指令/计划/目标 → L2(≤3 条)；一般消息 → L1(≤1 条)；寒暄 → L0(不注入省 token)。
+
+    v0.3 抢救修复：寒暄词表补全（你好/在吗/天气/早上好/晚安/哈哈/哦/好吧/拜拜/没问题 等），
+    短寒暄句不再漏判为 L1（8 场景审计场景 4：寒暄应零注入）。
+
+    v0.3 二次修复：寒暄判定改为**整句近似匹配**而非子串——单字词（好/行/嗯/哦）
+    子串匹配会把真实问题误判为寒暄（实测："我的回答风格偏好是什么" 因含"好"
+    被误判 L0 零注入）。现规则：去标点后的整句须以寒暄词开头且超出部分 ≤4 字。
+    """
     t = text.strip()
     if not t:
         return "L0"
@@ -1022,8 +1031,20 @@ def _inject_tier(text: str) -> str:
         "完善", "改成", "方案", "我们要", "接下来", "把", "用", "请",
     )):
         return "L2"
-    if len(t) < 12 and any(k in t for k in ("谢谢", "好的", "ok", "OK", "嗯", "可以", "再见", "了解", "收到")):
-        return "L0"
+    # 寒暄/无信息量：短句整句近似命中寒暄词 → 零注入
+    if len(t) < 20:
+        _CHIT_CHAT = (
+            "谢谢", "感谢", "好的", "ok", "OK", "嗯", "可以", "再见", "了解",
+            "收到", "你好", "您好", "在吗", "早上好", "下午好", "晚上好",
+            "晚安", "哈哈", "哦", "好吧", "拜拜", "没问题", "行", "好",
+            "明白", "明白了", "辛苦了",
+        )
+        core = re.sub(r"[\s,，。.!！?？~～、]+", "", t)
+        if core and any(
+            core == word or (core.startswith(word) and len(core) - len(word) <= 4)
+            for word in _CHIT_CHAT
+        ):
+            return "L0"
     return "L1"
 
 
@@ -1042,12 +1063,13 @@ def rpc_inject(params: dict[str, Any]) -> dict[str, Any]:
     if session_id:
         _cache_put(session_id, results)
     # 常驻基线快照（低频推式层）：approved 画像 + 高置信永久经验，digest 变更检测
+    # v0.3 抢救修复：传 query 做相关性闸门——无关主题/寒暄/无匹配时不注入画像经验（防噪音）
     snapshot_text = ""
     snapshot_digest = ""
     try:
         profile = eng["profile_store"].load()
         approved = profile if (profile is not None and profile.status == "approved") else None
-        snapshot_text, snapshot_digest = inj.build_static_snapshot(profile=approved)
+        snapshot_text, snapshot_digest = inj.build_static_snapshot(profile=approved, query=query)
     except Exception as exc:  # noqa: BLE001 - 快照失败不拖垮注入，但必须留痕可查
         with contextlib.suppress(Exception):
             eng["store"].log_decision("inject_snapshot_error", f"{type(exc).__name__}: {exc}")

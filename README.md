@@ -137,7 +137,7 @@ DeepSeek Harness (host 插件进程)
 
 ### 写入管线（双通道）
 
-1. **LLM 提取**（turn/end 自动）：增量扫本轮 user+assistant 文本 → 入 `runs` 队列 → 门卫 `should_extract`（零 LLM，寒暄轮标记 skipped 省调用）→ LLM 提取 → 事件卡/经验/知识分流落库 → 归链 → 冲突裁决 → 失败退避。JSON 输出有截断容错（补引号/插逗号/补闭合括号）。
+1. **LLM 提取**（turn/end 自动）：增量扫本轮 user+assistant 文本 → 入 `runs` 队列 → 门卫 `should_extract`（零 LLM，寒暄轮标记 skipped 省调用）→ LLM 提取 → 事件卡/经验/知识分流落库 → 归链 → 冲突裁决 → 失败退避。JSON 输出有截断容错（补引号/插逗号/补闭合括号）；**截断降级**（v0.3 抢救修复）：`finish_reason=length` 或 JSON 需结构修复 → 本批卡/wiki 强制 `evidence=uncertain` → 卡进 `lesson_pending` / wiki 进 `pending`（待审），残缺内容不自动固化（此前修复器成功会掩盖内容残缺）；单条提取 `max_tokens` 已由 1024 提至 2048。
 2. **零 LLM 规则 recorder**（user/message 即时，纯规则不抢 TTFT）：
    - "记住教训/踩坑/经验教训" → **立即 lesson_permanent**（永久经验）
    - "记住/记下/别忘了" → 立即事件卡
@@ -145,7 +145,7 @@ DeepSeek Harness (host 插件进程)
 
 ### 读取管线（注入 + 审计闭环）
 
-- **user/message 预取**：检索相关记忆（L2 ≤3 / L1 ≤1 / 寒暄 L0 零注入，50ms 超时宁缺勿滥）+ **常驻基线快照**（approved 画像 + 高置信永久经验，digest 变更检测、KV-cache 友好）→ 缓存 → system prompt 渲染时注入带溯源文本
+- **user/message 预取**：意图分档（L2 ≤3 / L1 ≤1 / 寒暄 L0 零注入——寒暄按**整句近似匹配**判定，含"好/行/嗯"的真实问题不误判；50ms 超时宁缺勿滥）+ **事实卡优先**（v0.3 抢救修复：lesson/permanent/偏好卡先做词面重叠补充检索并置顶，事件流水仅补位——避免多列 RRF 把零使用史的事实卡挤出注入）+ **常驻基线快照**（approved 画像 + 高置信永久经验，**相关性闸门**：query 不含身份/偏好/经验类语义词时不注入画像经验，防无关主题噪音；digest 变更检测、KV-cache 友好）→ 缓存 → system prompt 渲染时注入带溯源文本
 - **审计闭环**：turn 结束后判定注入是否被回复利用（规则归因零 LLM）→ 命中滚动 / 连续 ≥3 次未命中降权淡出（"没被利用" ≠ "记忆错误"）
 
 ### 生命周期治理（规则驱动，零 LLM）
@@ -157,7 +157,7 @@ DeepSeek Harness (host 插件进程)
 ### 画像蒸馏
 
 - 手动触发（UI「画像」tab 或 RPC `distill`）：收集事件树 → LLM 生成画像摘要 + 用户人格维度（MBTI + 8 轴，属画像数据而非 persona 库）→ 防抖/去重 → 草稿 → **人工采纳**固化（version+1，草稿移入 `approved/` 防重复采纳）→ 进入注入常驻基线
-- 画像 = 常驻注入的用户画像信息：每轮对话的 system prompt 携带画像摘要（身份/偏好/协作方式），作为模型的稳定用户背景
+- 画像 = 用户画像信息（身份/偏好/协作方式），作为模型的稳定用户背景；**相关性闸门**（v0.3 抢救修复）：仅在 query 含身份/偏好/经验类语义词时随常驻基线注入，无关主题/寒暄不携带
 
 ### 工程保障
 
