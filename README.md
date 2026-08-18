@@ -165,6 +165,7 @@ DeepSeek Harness (host 插件进程)
 - **安全**：POST 严格同源校验；GET 无 Origin 须带本地标记 header（防跨站状态污染）；RPC 参数路径穿越白名单；Sidecar 仅监听 127.0.0.1；密钥脱敏回显 + `apiKeyEnv` 渐进迁移
 - **可移植**：引擎路径自动探测（env → config → 自动），Python 可执行文件同理；无 Node 原生依赖
 - **可测试**：独立冒烟脚本（真实 spawn sidecar）、引擎 324 个单元测试、JSON 修复器专项用例
+- **版本规范**（2026-08-19 起）：每次 bug 修复或功能更新**变更版本号**（semver：修复=patch、新功能=minor）并随代码同 commit、打 `vX.Y.Z` tag 同步推送；当前 `v0.1.1`
 
 ---
 

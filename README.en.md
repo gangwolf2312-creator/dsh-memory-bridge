@@ -165,6 +165,7 @@ DeepSeek Harness (host plugin process)
 - **Security**: POST strict same-origin check; GET without Origin must carry the local-marker header (blocks cross-site state pollution); RPC param path-traversal whitelist; sidecar listens only on 127.0.0.1; secrets masked on read + `apiKeyEnv` gradual migration
 - **Portability**: engine path auto-detection (env → config → auto), same for the Python executable; no Node native deps
 - **Testability**: standalone smoke script (spawns the real sidecar), 324 engine unit tests, dedicated JSON-fixer cases
+- **Versioning** (since 2026-08-19): every bug fix or feature update bumps the version (semver: fixes = patch, features = minor), committed with the code, tagged `vX.Y.Z` and pushed together; current `v0.1.1`
 
 ---
 
