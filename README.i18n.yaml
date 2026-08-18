@@ -3,5 +3,5 @@
 # after editing either side, bring the other along and re-record with:
 #   git hash-object README.md / README.en.md
 # Chinese is the default display language (GitHub renders README.md on the repo home).
-README.md: c8723c3ab5fcaf4f44fe9db1a35d54f0f1c5bed7
-README.en.md: f34e828cb8db525c349ed14108d0e529a11d793f
+README.md: ccedbf35ad1ac7c72ee28263ea126fc723bf230d
+README.en.md: a95f99703874472578e8f06d9f5227b244f2215f

@@ -25,6 +25,16 @@ But with **local models** (Ollama et al.) the situation is different: context wi
 
 Approach: extract, structure, and store what's worth keeping (who you are, what you did, which decisions were accepted, which lessons were validated), then **inject only the relevant few items** each turn (not the whole history). Memory stays usable even with a small window.
 
+**Relationship to DSH's native context (boundary)**:
+
+| Scenario | DSH native behavior | This plugin's role |
+|---|---|---|
+| **Fresh session** | history empty | Plugin injection is the **only cross-session memory source** (core value) |
+| **Resumed session** | full history replayed into context | Plugin injection **adds to** the history (does not replace it); both occupy the window in parallel |
+| **Over-window session** | compaction summarizes history | Plugin injection **supplements** details the summary lacks (complementary) |
+
+> **Explicit boundary**: this plugin injects into the **dynamic context of the system prompt** (`systemPrompt.context`); it does **not replace or suppress DSH's session-history injection** (history is fully derived by dsh-session's `deriveMessages`; the plugin has no API to trim it). **In-session history slimming is DSH compaction's job**; this plugin handles **cross-session persistent facts** — complementary, not overlapping.
+
 **Audience**:
 
 | Audience | How they use it |
@@ -54,8 +64,8 @@ Approach: extract, structure, and store what's worth keeping (who you are, what 
 
 | Pain point | How this plugin addresses it |
 |---|---|
-| **Constrained context window**: local models 4K-32K can't fit history; cloud relies on a 1M window at cost | Injects only the relevant few memories (tiered, capped) — small windows stay usable; cloud saves tokens |
-| **New sessions don't carry old facts**: resume/fork only continues an old conversation; a fresh session still doesn't know who you are, what you did, prior decisions | Auto-extract to a persistent layer, inject on demand in new sessions to restore key context |
+| **Cross-session memory missing**: new/compacted sessions don't carry old facts; resume only continues an old conversation | Auto-extract to a persistent layer, inject relevant memories to restore context (cross-session facts, not in-session history) |
+| **Small window can't hold all memory**: local models 4K-32K can't fit history; in-session overrun is DSH compaction's job, cross-session facts come from on-demand injection (tiered, capped) | Injects only the relevant few memories (L2≤3/L1≤1/greetings 0), avoids stuffing all history into the prompt |
 | **History isn't searchable/governable**: session logs are raw text — can't ask "what preference did I state before?" | Structured memory cards + relevance-ranked retrieval + tiered injection + governance loop |
 | **Memory can't be trusted**: model "remembering" may be hallucination | Zero-LLM relevance retrieval on read; evidence tags + provenance on write; low-confidence goes to human review |
 | **Data black box**: memory locked in a database/vector store, unreadable/uneditable | Plain-Markdown source of truth, readable/editable/portable |
