@@ -22,6 +22,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+# --- bootstrap ------------------------------------------------------------
+# The harness host passes --root <engine root>; it must be on sys.path before
+# any ``memory.*`` top-level import below.  main() also prepends the root, but
+# that runs after module-level imports, so the bootstrap mirrors it here.
+def _prepend_engine_root() -> None:
+    for idx, arg in enumerate(sys.argv):
+        if arg == "--root" and idx + 1 < len(sys.argv):
+            root = Path(sys.argv[idx + 1]).resolve()
+            if str(root) not in sys.path:
+                sys.path.insert(0, str(root))
+            return
+
+
+_prepend_engine_root()
+
+from memory.store import now_iso  # noqa: F401  (rpc_add_run 时间戳)
+
 BANNER = "DMB_PORT"
 
 _engine_root: str | None = None
@@ -39,18 +56,30 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "baseUrl": "",
         "model": "",
         "apiKey": "",
+        "apiKeyEnv": "",  # 优先读环境变量（渐进迁移：设了环境变量即不再用明文）
         "sanitize": True,
     },
     "cloud": {
         "baseUrl": "https://api.deepseek.com/v1",
         "model": "deepseek-chat",
         "apiKey": "",
+        "apiKeyEnv": "",
         "sanitize": True,
         "batchSize": 8,
         "maxCallsPerMinute": 10,
     },
     "main": {"sanitize": True},
 }
+
+
+def _resolve_api_key(section: dict[str, Any]) -> str:
+    """apiKey 解析：环境变量（apiKeyEnv 指定）优先，回退明文配置。"""
+    env_name = str(section.get("apiKeyEnv", "") or "").strip()
+    if env_name:
+        env_val = os.environ.get(env_name, "")
+        if env_val.strip():
+            return env_val.strip()
+    return str(section.get("apiKey", "") or "")
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +145,9 @@ def ensure_engine() -> dict[str, Any]:
         import jieba  # noqa: F401  (bundled pure-python package)
         import memory as mem
         from memory.audit import audit_summary
+        from memory.decay import DecayMaintenance
         from memory.extract import MemoryWritePipeline
+        from memory.govern import apply_usage_feedback, govern_injection
         from memory.injector import MemoryInjector
         from memory.lemonade import LemonadeManager
         from memory.search import MemorySearch
@@ -133,6 +164,10 @@ def ensure_engine() -> dict[str, Any]:
         # 崩溃/重启对账：遗留 extracting 认领回滚为 staged（引擎管道只认 staged/failed）
         with contextlib.suppress(Exception):
             store._exec("UPDATE runs SET status = 'staged' WHERE status = 'extracting'")
+        decay = DecayMaintenance(store, branch_idle_days=30)
+        # 启动对账：清理历史积压（30 天 idle 的枝完结 + 子卡枯萎；幂等）
+        with contextlib.suppress(Exception):
+            decay.run_once()
         _engine = {
             "mem": mem,
             "store": store,
@@ -141,6 +176,9 @@ def ensure_engine() -> dict[str, Any]:
             "wiki_search": wiki_search,
             "lemonade": lemonade,
             "injector": MemoryInjector(search),
+            "decay": decay,
+            "apply_usage_feedback": apply_usage_feedback,
+            "govern_injection": govern_injection,
             "pipeline_cls": MemoryWritePipeline,
             "memory_root": str(memory_root),
             "wiki_root": str(wiki_root),
@@ -162,13 +200,13 @@ def to_extract_config(cfg: dict[str, Any]):
             auto_manage=bool(local.get("autoManage", True)),
             base_url=local.get("baseUrl", ""),
             model=local.get("model", ""),
-            api_key=local.get("apiKey", ""),
+            api_key=_resolve_api_key(local),
             sanitize=bool(local.get("sanitize", True)),
         ),
         cloud=mem.CloudConfig(
             base_url=cloud.get("baseUrl", "https://api.deepseek.com/v1"),
             model=cloud.get("model", "deepseek-chat"),
-            api_key=cloud.get("apiKey", ""),
+            api_key=_resolve_api_key(cloud),
             sanitize=bool(cloud.get("sanitize", True)),
             batch_size=int(cloud.get("batchSize", 8)),
             max_calls_per_minute=int(cloud.get("maxCallsPerMinute", 10)),
@@ -408,6 +446,7 @@ def rpc_add_run(params: dict[str, Any]) -> dict[str, Any]:
         user_text=user_text,
         reply_text=reply_text,
         tier=str(params.get("tier", "L0")),
+        ts=now_iso(),  # M2：缺省 ts 会让 ORDER BY ts 排序失效、时间列全空
         project_id=str(params.get("projectId") or None),
         trace_event_id=str(params.get("traceEventId", "")),
         priority=int(params.get("priority", 0)),
@@ -514,7 +553,13 @@ def rpc_config_set(params: dict[str, Any]) -> dict[str, Any]:
     merged["mode"] = str(cfg.get("mode", "main"))
     for section in ("local", "cloud", "main"):
         src = cfg.get(section) if isinstance(cfg.get(section), dict) else {}
-        merged[section].update({k: v for k, v in src.items() if k in merged[section]})
+        incoming = {k: v for k, v in src.items() if k in merged[section]}
+        # B2 防护：UI 回读的是掩码 key（sk-****…）。用户改任意配置保存时若
+        # 提交的仍是掩码串 → 视为"未修改 key"，保留旧值，避免明文 key 被覆盖丢失。
+        if "apiKey" in incoming and isinstance(incoming["apiKey"], str) and "*" in incoming["apiKey"]:
+            old_key = _config.get(section, {}).get("apiKey", "")
+            incoming["apiKey"] = old_key
+        merged[section].update(incoming)
     # 校验：开关激活后的必填项立即报错，避免"保存了但提取必挂"
     try:
         to_extract_config(merged)
@@ -550,6 +595,10 @@ def rpc_extract(params: dict[str, Any]) -> dict[str, Any]:
         if n <= 0:
             break
         total += n
+    # 提取后自动维护：衰减判定（30 天 idle 枝完结）+ 节流全局治理（6h 一次）
+    with contextlib.suppress(Exception):
+        eng["decay"].run_once() if _decay_due() else None
+        _run_govern_if_due(eng)
     return {"ok": True, "mode": mode, "extracted": total, "processed": total}
 
 
@@ -670,24 +719,101 @@ def rpc_graph(_params: dict[str, Any] | None = None) -> dict[str, Any]:
 # 注入结果；system prompt 渲染时同步取文本；turn 结束后回传审计闭环。
 # ---------------------------------------------------------------------------
 
-_inject_cache: dict[str, list] = {}  # session_id -> list[SearchResult]（最近注入）
+_inject_cache: dict[str, tuple[float, list]] = {}  # session_id -> (ts, list[SearchResult])
+_INJECT_CACHE_MAX = 256          # M3：容量上限（防无界增长）
+_INJECT_CACHE_TTL = 30 * 60      # M3：TTL 秒（惰性淘汰，会话中断/无 turn/end 也不残留）
+
+
+def _cache_put(session_id: str, results: list) -> None:
+    """写注入缓存（带 TTL + 容量上限惰性淘汰）。"""
+    import time as _t
+
+    now = _t.time()
+    if len(_inject_cache) >= _INJECT_CACHE_MAX:
+        # 超限：淘汰最旧条目（惰性扫描，量小可接受）
+        oldest = min(_inject_cache, key=lambda k: _inject_cache[k][0])
+        _inject_cache.pop(oldest, None)
+    _inject_cache[session_id] = (now, results)
+
+
+def _cache_get(session_id: str) -> list:
+    """读注入缓存（过期即弃）。"""
+    import time as _t
+
+    hit = _inject_cache.get(session_id)
+    if hit is None:
+        return []
+    ts, results = hit
+    if _t.time() - ts > _INJECT_CACHE_TTL:
+        _inject_cache.pop(session_id, None)
+        return []
+    return results
+
+
+def _cache_pop(session_id: str) -> list:
+    hit = _inject_cache.pop(session_id, None)
+    return hit[1] if hit else []
+
+
+def _dedup_inject(results: list) -> list:
+    """注入去重：多轮重复提取会生成标题/内容相同的卡，全量注入浪费上下文。
+
+    - 标题完全相同 → 只保留 score 最高的一条
+    - 同一链下最多 2 条（不同标题的卡同链可能都有价值，但限流保多样性）
+    """
+    if len(results) <= 1:
+        return results
+    by_title: dict[str, list] = {}
+    for r in results:
+        by_title.setdefault(r.title.strip(), []).append(r)
+    picked: list = []
+    for _title, group in by_title.items():
+        picked.append(max(group, key=lambda r: r.score))
+    seen_chain: dict[str, int] = {}
+    final: list = []
+    for r in picked:
+        chain = r.chain_id or ""
+        if seen_chain.get(chain, 0) >= 2:
+            continue
+        seen_chain[chain] = seen_chain.get(chain, 0) + 1
+        final.append(r)
+    return final
+
+
+def _inject_tier(text: str) -> str:
+    """注入档位自动判定：指令/计划/目标 → L2(≤3 条)；一般消息 → L1(≤1 条)；寒暄 → L0(不注入省 token)。"""
+    t = text.strip()
+    if not t:
+        return "L0"
+    # minor-1：先查 L2 指令关键词（"好的，继续"含"继续"应判 L2，不能因含寒暄词被 L0 吞掉）
+    if any(k in t for k in (
+        "记住", "以后", "计划", "目标", "我们需要", "帮我", "继续", "修复",
+        "完善", "改成", "方案", "我们要", "接下来", "把", "用", "请",
+    )):
+        return "L2"
+    if len(t) < 12 and any(k in t for k in ("谢谢", "好的", "ok", "OK", "嗯", "可以", "再见", "了解", "收到")):
+        return "L0"
+    return "L1"
 
 
 def rpc_inject(params: dict[str, Any]) -> dict[str, Any]:
-    """按用户消息检索相关记忆，返回带溯源的注入文本（L2 档 ≤3 条，50ms 超时）。"""
+    """按用户消息检索相关记忆，返回带溯源的注入文本（tier 自动判定，已去重，50ms 超时）。"""
     eng = ensure_engine()
     query = str(params.get("query", "")).strip()[:2000]
     if not query:
         return {"text": "", "cards": [], "count": 0}
     session_id = str(params.get("sessionId", ""))
-    tier = str(params.get("tier", "L2"))
+    tier = str(params.get("tier", "auto") or "auto")
+    if tier in ("auto", ""):
+        tier = _inject_tier(query)
     inj = eng["injector"]
-    results = inj.inject_for_tier(tier, query)
+    results = _dedup_inject(inj.inject_for_tier(tier, query))
     if session_id:
-        _inject_cache[session_id] = results
+        _cache_put(session_id, results)
     text = "\n".join(inj.format_result(r) for r in results)
     return {
         "text": text,
+        "tier": tier,
         "cards": [
             {
                 "cardId": r.card_id,
@@ -707,11 +833,68 @@ def rpc_record_usage(params: dict[str, Any]) -> dict[str, Any]:
     eng = ensure_engine()
     session_id = str(params.get("sessionId", ""))
     reply = str(params.get("replyText", ""))
-    results = _inject_cache.pop(session_id, [])
+    results = _cache_pop(session_id)
     if not results or not reply.strip():
         return {"ok": True, "usage": {}}
     usage = eng["injector"].record_usage(results, reply)
+    # 审计回流：used→命中滚动 / unused→miss 累计、达阈值降权淡出（治理闭环）
+    if usage:
+        with contextlib.suppress(Exception):
+            eng["apply_usage_feedback"](eng["store"], usage)
     return {"ok": True, "usage": usage}
+
+
+# ---------------------------------------------------------------------------
+# 衰减治理（P2 接线）：提取后自动衰减 + 节流全局治理 + 手动维护端点
+# ---------------------------------------------------------------------------
+
+_last_govern_at: float = 0.0
+_GOVERN_INTERVAL_SECONDS = 6 * 3600  # 全局治理节流：6 小时一次
+_last_decay_at: float = 0.0
+_DECAY_INTERVAL_SECONDS = 30 * 60   # M7：decay 全树扫描节流：30 分钟一次
+
+
+def _decay_due() -> bool:
+    """decay 节流（M7）：全树扫描开销大，不随每次提取执行。"""
+    global _last_decay_at
+    import time as _t
+
+    now = _t.time()
+    if now - _last_decay_at < _DECAY_INTERVAL_SECONDS:
+        return False
+    _last_decay_at = now
+    return True
+
+
+def _run_govern_if_due(eng: dict[str, Any]) -> None:
+    """健康指标驱动的全局治理（govern_injection），节流执行。"""
+    global _last_govern_at
+    import time as _t
+
+    now = _t.time()
+    if now - _last_govern_at < _GOVERN_INTERVAL_SECONDS:
+        return
+    _last_govern_at = now
+    with contextlib.suppress(Exception):
+        eng["govern_injection"](eng["store"])
+
+
+def rpc_maintenance(_params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """手动触发一轮衰减 + 全局治理；返回报告（写 decision_log 可审计）。"""
+    eng = ensure_engine()
+    decay_res = eng["decay"].run_once()
+    report = eng["govern_injection"](eng["store"])
+    return {
+        "ok": True,
+        "decay": decay_res,
+        "govern": {
+            "inject_used_rate": report.inject_used_rate,
+            "judged_cards": report.judged_cards,
+            "degradedCards": len(report.degraded_cards),
+            "suggestedLimits": list(report.suggested_limits),
+            "actions": list(report.actions),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -737,6 +920,7 @@ METHODS: dict[str, Any] = {
     "graph": rpc_graph,
     "inject": rpc_inject,
     "recordUsage": rpc_record_usage,
+    "maintenance": rpc_maintenance,
 }
 
 
@@ -752,6 +936,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("content-length", "0"))
+            if length <= 0 or length > 1_048_576:  # 1MB 上限（host 层 64KB 的宽松后备）
+                self._send(413, {"ok": False, "error": "request body too large"})
+                return
             body = json.loads(self.rfile.read(length) or b"{}")
         except Exception as exc:
             self._send(400, {"ok": False, "error": f"bad json: {exc}"})

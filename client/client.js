@@ -147,9 +147,9 @@ var CSS2 = [
 	".dmb-graph-node:hover circle, .dmb-graph-node.active circle { filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }",
 	".dmb-graph-node text { font-size: 10.5px; fill: var(--dmb-text3); opacity: 0.82; pointer-events: none; user-select: none; paint-order: stroke; stroke: var(--dmb-card); stroke-width: 2.5px; transition: opacity 0.15s ease; }",
 	".dmb-graph-node:hover text, .dmb-graph-node.active text { fill: var(--dmb-text); font-weight: 600; opacity: 1; }",
-	".dmb-graph-edge { transition: opacity 0.18s ease; opacity: 0.7; }",
+	".dmb-graph-edge { transition: opacity 0.18s ease; opacity: 0.45; }",
 	"@keyframes dmb-dashflow { to { stroke-dashoffset: -36; } }",
-	".dmb-graph-edge.lit { stroke-dasharray: 9 7 !important; animation: dmb-dashflow 0.7s linear infinite; }",
+	".dmb-graph-edge.lit { stroke-dasharray: 9 7 !important; animation: dmb-dashflow 0.7s linear infinite; stroke-width: 2 !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(96,165,250,0.85)); }",
 	".dmb-graph-tip { position: absolute; pointer-events: none; z-index: 30; max-width: 280px; padding: 9px 11px; border-radius: 9px; background: var(--dmb-card); border: 1px solid var(--dmb-border2); box-shadow: 0 10px 28px rgba(0,0,0,0.28); font-size: 12px; color: var(--dmb-text); opacity: 0; transition: opacity 0.12s ease; }",
 	".dmb-graph-tip .t { font-weight: 600; margin-bottom: 2px; }",
 	".dmb-graph-tip .k { color: var(--dmb-text3); font-size: 10.5px; }",
@@ -164,6 +164,47 @@ var CSS2 = [
 	".dmb-graph-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--dmb-text3); align-items: center; }",
 	".dmb-graph-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }",
 	".dmb-graph-hint { font-size: 11px; color: var(--dmb-text3); }",
+	/* tree tab: 记忆树层级视图 */
+	".dmb-tree-wrap { border: 1px solid var(--dmb-border); border-radius: var(--dmb-radius); background: var(--dmb-card); padding: 8px 6px; }",
+	".dmb-tree-group { font-size: 11px; font-weight: 600; color: var(--dmb-text3); letter-spacing: 0.6px; text-transform: uppercase; margin: 12px 8px 4px; }",
+	".dmb-tree-item { font-size: 12.5px; }",
+	".dmb-tree-row { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 7px; cursor: pointer; min-width: 0; }",
+	".dmb-tree-row:hover { background: var(--dmb-hover); }",
+	".dmb-tree-chain > .dmb-tree-row { font-weight: 600; color: var(--dmb-text); }",
+	".dmb-tree-leaf.active > .dmb-tree-row { background: color-mix(in srgb, var(--dmb-brand) 12%, transparent); }",
+	".dmb-tree-arrow { width: 12px; flex: none; color: var(--dmb-text3); font-size: 9px; transition: transform 0.15s ease; text-align: center; }",
+	".dmb-tree-arrow.open { transform: rotate(90deg); }",
+	".dmb-tree-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }",
+	".dmb-tree-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
+	".dmb-tree-badge { margin-left: auto; flex: none; padding: 0 7px; border-radius: 999px; background: var(--dmb-hover); color: var(--dmb-text3); font-size: 10.5px; font-weight: 600; }",
+	".dmb-tree-time { margin-left: auto; flex: none; color: var(--dmb-text3); font-size: 10.5px; font-variant-numeric: tabular-nums; }",
+	".dmb-tree-summary { flex: none; max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dmb-accent2); font-size: 11px; font-weight: 400; }",
+	".dmb-tree-snip { margin: 0 8px 6px 29px; color: var(--dmb-text2); font-size: 11.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }",
+	".dmb-tree-kids { margin-left: 14px; border-left: 1px solid var(--dmb-border); padding-left: 4px; }",
+	/* event graph: 图在上、树导航在下（上下布局） */
+	".dmb-eg-nav { width: 100%; display: flex; flex-direction: column; margin-top: 10px; }",
+	".dmb-eg-nav.collapsed { display: none; }",
+	".dmb-eg-nav-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 6px; }",
+	".dmb-eg-nav-body { display: flex; flex-direction: column; gap: 6px; }",
+	".dmb-nav-search { height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--dmb-border2); background: var(--dmb-card2); color: var(--dmb-text); font-size: 12px; outline: none; }",
+	".dmb-eg-tree { max-height: 220px; overflow-y: auto; }",
+	".dmb-eg-main { width: 100%; }",
+	".dmb-eg-main .dmb-graph-svg { height: 560px; }",
+	".dmb-tree-chain > .dmb-tree-row.active { background: color-mix(in srgb, var(--dmb-accent2) 14%, transparent); }",
+	/* timeline tab */
+	".dmb-tl-day { font-size: 11px; font-weight: 600; color: var(--dmb-text3); letter-spacing: 0.6px; text-transform: uppercase; margin: 14px 2px 6px; }",
+	".dmb-tl-item { display: flex; gap: 10px; padding: 9px 12px; border-radius: 10px; background: var(--dmb-card); border: 1px solid var(--dmb-border); margin-bottom: 6px; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; }",
+	".dmb-tl-item:hover { border-color: var(--dmb-border2); background: var(--dmb-hover); }",
+	".dmb-tl-item.active { border-color: var(--dmb-brand); background: color-mix(in srgb, var(--dmb-brand) 8%, transparent); }",
+	".dmb-tl-item .dmb-tree-dot { margin-top: 4px; flex: none; }",
+	".dmb-tl-item .t { font-weight: 600; font-size: 13px; }",
+	".dmb-tl-item .c { color: var(--dmb-text2); font-size: 12px; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }",
+	".dmb-tl-item .m { color: var(--dmb-text3); font-size: 10.5px; margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }",
+	/* knowledge graph tab */
+	".dmb-wg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }",
+	".dmb-wg-item { padding: 8px 10px; border-radius: 9px; background: var(--dmb-card); border: 1px solid var(--dmb-border); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
+	".dmb-wg-item:hover { border-color: var(--dmb-border2); background: var(--dmb-hover); }",
+	".dmb-wg-item.active { border-color: var(--dmb-brand); background: color-mix(in srgb, var(--dmb-brand) 8%, transparent); }",
 ].join("\n");
 
 if (typeof document !== "undefined" && !document.getElementById("dmb-styles")) {
@@ -177,7 +218,8 @@ if (typeof document !== "undefined" && !document.getElementById("dmb-styles")) {
 var api = {
 	get: function (path, params) {
 		var q = params ? "?" + Object.keys(params).map(function (k) { return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]); }).join("&") : "";
-		return fetch("/dsh-memory/" + path + q, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (b) { if (!b.ok) throw new Error(b.error || "request failed"); return b.result; });
+		// M6：本地标记 header（跨站 img/script 无法携带，防 GET 写副作用被跨站触发）
+		return fetch("/dsh-memory/" + path + q, { cache: "no-store", headers: { "x-dsh-memory": "1" } }).then(function (r) { return r.json(); }).then(function (b) { if (!b.ok) throw new Error(b.error || "request failed"); return b.result; });
 	},
 	post: function (path, body) {
 		return fetch("/dsh-memory/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ params: body || {} }) }).then(function (r) { return r.json(); }).then(function (b) { if (!b.ok) throw new Error(b.error || "request failed"); return b.result; });
@@ -378,9 +420,9 @@ function MemoryPanel() {
 
 	var tabs = [
 		{ id: "overview", label: "总览" },
-		{ id: "graph", label: "图谱" },
-		{ id: "cards", label: "记忆卡" },
-		{ id: "wiki", label: "知识库" },
+		{ id: "eventgraph", label: "事件图谱" },
+		{ id: "wikigraph", label: "知识图谱" },
+		{ id: "timeline", label: "时间线" },
 		{ id: "review", label: "待审", badge: pendingCount || undefined },
 		{ id: "audit", label: "审计" }
 	];
@@ -405,9 +447,9 @@ function MemoryPanel() {
 		h("div", { className: "dmb-body" },
 			loading && tab === "overview" ? h(Spinner, null) : null,
 			tab === "overview" ? h(OverviewTab, { data: overview, refresh: refresh }) : null,
-			tab === "graph" ? h(GraphTab, { refreshKey: refreshKey }) : null,
-			tab === "cards" ? h(CardsTab, { onPendingChange: setPendingCount }) : null,
-			tab === "wiki" ? h(WikiTab, null) : null,
+			tab === "eventgraph" ? h(EventGraphTab, { refreshKey: refreshKey }) : null,
+			tab === "wikigraph" ? h(WikiGraphTab, { refreshKey: refreshKey }) : null,
+			tab === "timeline" ? h(TimelineTab, { refreshKey: refreshKey }) : null,
 			tab === "review" ? h(ReviewTab, { onPendingChange: setPendingCount }) : null,
 			tab === "audit" ? h(AuditTab, null) : null
 		)
@@ -577,129 +619,6 @@ function ConfigForm(props) {
 }
 
 /* cards tab */
-function CardsTab(props) {
-	var _s11 = useState(""), query = _s11[0], setQuery = _s11[1];
-	var _s12 = useState(null), data = _s12[0], setData = _s12[1];
-	var _s13 = useState(true), loading = _s13[0], setLoading = _s13[1];
-	var _s14 = useState(null), detail = _s14[0], setDetail = _s14[1];
-	var _s15 = useState("all"), kind = _s15[0], setKind = _s15[1];
-	var _s16 = useState(0), version = _s16[0], setVersion = _s16[1];
-	var toast = useToast();
-
-	var load = useCallback(function (q, k) {
-		setLoading(true);
-		if (q && q.trim()) {
-			api.get("search", { q: q.trim(), limit: 40 }).then(function (r) {
-				setData({ mode: "search", items: (r.results || []).map(function (x) { return { id: x.cardId, title: x.title, snippet: x.snippet, kind: x.kind || "event", score: x.score, chainTitle: x.chainTitle, createdAt: x.createdAt }; }) });
-			}).catch(function (e) { toast.show(String((e && e.message) || e), "err"); }).finally(function () { setLoading(false); });
-		} else {
-			api.get("browse", { kind: k === "all" ? "" : k, limit: 200 }).then(function (r) { setData({ mode: "browse", items: r.cards || [] }); }).catch(function (e) { toast.show(String((e && e.message) || e), "err"); }).finally(function () { setLoading(false); });
-		}
-	}, [toast]);
-
-	useEffect(function () { load("", kind); }, [version]);
-
-	var open = function (id) {
-		api.get("card", { id: id }).then(function (r) { setDetail(r.card); }).catch(function (e) { toast.show(String((e && e.message) || e), "err"); });
-	};
-
-	var act = function (id, action) {
-		api.post("card-action", { id: id, action: action }).then(function () {
-			toast.show(action, "ok");
-			setDetail(null);
-			setVersion(function (v) { return v + 1; });
-			props.onPendingChange && props.onPendingChange();
-		}).catch(function (e) { toast.show(String((e && e.message) || e), "err"); });
-	};
-
-	var filters = [["all", "全部"], ["event", "事件"], ["chain", "事件链"], ["lesson_pending", "待审"], ["lesson_permanent", "经验"], ["profile", "画像"]];
-
-	return h("div", null,
-		h("div", { className: "dmb-search" },
-			h("span", { className: "mag" }, h(Icon, { name: "search", size: 14 })),
-			h("input", { placeholder: "搜索记忆：如「上次搬家注意什么」「服务器端口」", value: query, onChange: function (e) { setQuery(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") load(query, kind); } }),
-			query ? h("button", { className: "clear", onClick: function () { setQuery(""); load("", kind); } }, h(Icon, { name: "x", size: 12 })) : null
-		),
-		h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 } },
-			filters.map(function (f) {
-				return h("button", { key: f[0], className: "dmb-chip" + (kind === f[0] ? " active" : ""), onClick: function () { setKind(f[0]); load(query, f[0]); } }, f[1]);
-			})
-		),
-		loading ? h(Spinner, null) : !data || data.items.length === 0 ? h(Empty, null, "没有匹配的记忆卡") :
-			data.items.map(function (item, i) {
-				return h("div", { key: item.id, className: "dmb-result", style: { animationDelay: Math.min(i * 40, 300) + "ms" }, onClick: function () { open(item.id); } },
-					h("div", { className: "top" }, h("span", { className: "t" }, item.title || item.id), h(KindBadge, { kind: item.kind }), item.chainTitle ? h("span", { className: "chain" }, h(Icon, { name: "link", size: 11 }), item.chainTitle) : null),
-					typeof item.score === "number" ? h("div", { className: "scorebar" }, h("i", { style: { width: Math.max(4, Math.min(100, item.score * 100)) + "%" } })) : null,
-					item.snippet ? h("div", { className: "snip" }, item.snippet) : null,
-					h("div", { className: "meta" }, item.createdAt ? h("span", { className: "dmb-ic-line" }, h(Icon, { name: "clock", size: 11 }), item.createdAt) : null, item.sourcePath ? h("span", { className: "dmb-ic-line" }, h(Icon, { name: "file", size: 11 }), item.sourcePath) : null)
-				);
-			}),
-		detail ? h(CardDetail, { card: detail, onClose: function () { setDetail(null); }, onAction: act }) : null,
-		toast.node
-	);
-}
-
-function CardDetail(props) {
-	var card = props.card;
-	var kind = card.kind || "event";
-	var pending = kind === "lesson_pending";
-	return h("div", { className: "dmb-detail", onClick: function (e) { if (e.target === e.currentTarget) props.onClose(); } },
-		h("div", { className: "panel" },
-			h("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, h("span", { style: { fontSize: 15, fontWeight: 800 } }, card.title || card.id), h(KindBadge, { kind: kind })),
-			h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0" } },
-				h("span", { className: "dmb-tag" }, "置信 ", h("b", null, ((card.confidence || 0) * 100).toFixed(0) + "%")),
-				h("span", { className: "dmb-tag" }, "佐证 ", h("b", null, String(card.corroborations || 0))),
-				h("span", { className: "dmb-tag" }, "命中 ", h("b", null, String(card.hit_count || 0))),
-				h("span", { className: "dmb-tag" }, "证据 ", h("b", null, card.evidence || "—")),
-				h("span", { className: "dmb-tag" }, "状态 ", h("b", null, card.status || "active"))
-			),
-			h("div", { style: { color: "var(--dmb-text2)", fontSize: 12, whiteSpace: "pre-wrap" } }, card.content || ""),
-			card.source_path ? h("div", { className: "raw" }, card.source_path) : null,
-			h("div", { className: "dmb-actions" },
-				pending ? h("button", { className: "dmb-btn primary", onClick: function () { props.onAction(card.id, "approve"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "check", size: 13 }), "采纳")) : null,
-				pending ? h("button", { className: "dmb-btn danger", onClick: function () { props.onAction(card.id, "archive"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "archive", size: 13 }), "归档")) : null,
-				card.status === "archived" ? h("button", { className: "dmb-btn", onClick: function () { props.onAction(card.id, "restore"); } }, "↩ 恢复") : null,
-				h("button", { className: "dmb-btn", onClick: function () { props.onAction(card.id, "archive"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "archive", size: 13 }), "归档")),
-				h("button", { className: "dmb-btn danger", onClick: function () { props.onAction(card.id, "delete"); } }, h("span", { className: "dmb-ic" }, h(Icon, { name: "trash", size: 13 }), "删除")),
-				h("button", { className: "dmb-btn", onClick: props.onClose }, "关闭")
-			)
-		)
-	);
-}
-
-/* wiki tab */
-function WikiTab() {
-	var _s17 = useState(""), query = _s17[0], setQuery = _s17[1];
-	var _s18 = useState(null), data = _s18[0], setData = _s18[1];
-	var _s19 = useState(false), loading = _s19[0], setLoading = _s19[1];
-	var toast = useToast();
-
-	var search = function () {
-		if (!query.trim()) return;
-		setLoading(true);
-		api.get("wiki", { q: query.trim(), limit: 30 }).then(function (r) { setData(r.results || []); }).catch(function (e) { toast.show(String((e && e.message) || e), "err"); }).finally(function () { setLoading(false); });
-	};
-
-	return h("div", null,
-		h("div", { className: "dmb-search" },
-			h("span", { className: "mag" }, h(Icon, { name: "book", size: 14 })),
-			h("input", { placeholder: "搜索知识库：规范、概念、教程", value: query, onChange: function (e) { setQuery(e.target.value); }, onKeyDown: function (e) { if (e.key === "Enter") search(); } }),
-			query ? h("button", { className: "clear", onClick: function () { setQuery(""); setData(null); } }, h(Icon, { name: "x", size: 12 })) : null
-		),
-		loading ? h(Spinner, null) : !data ? h(Empty, null, "输入关键词检索知识库") :
-			data.length === 0 ? h(Empty, null, "无命中") :
-			data.map(function (r, i) {
-				return h("div", { key: r.entryId + r.sectionPath, className: "dmb-result", style: { animationDelay: Math.min(i * 40, 300) + "ms" } },
-					h("div", { className: "top" }, h("span", { className: "t" }, r.title), r.specId ? h("span", { className: "chain" }, h(Icon, { name: "ruler", size: 11 }), r.specId) : null),
-					h("div", { className: "snip" }, r.snippet || ""),
-					h("div", { className: "meta" }, r.sectionPath ? h("span", { className: "dmb-ic-line" }, h(Icon, { name: "pin", size: 11 }), r.sectionPath) : null, h("span", null, "score " + ((r.score || 0)).toFixed(2)))
-				);
-			}),
-		toast.node
-	);
-}
-
-/* review tab */
 function ReviewTab(props) {
 	var _s20 = useState(null), data = _s20[0], setData = _s20[1];
 	var _s21 = useState(null), pendingLessons = _s21[0], setPendingLessons = _s21[1];
@@ -759,11 +678,25 @@ function ReviewTab(props) {
 function AuditTab() {
 	var _s24 = useState(null), data = _s24[0], setData = _s24[1];
 	var _s25 = useState(true), loading = _s25[0], setLoading = _s25[1];
+	var _s26 = useState(false), maintBusy = _s26[0], setMaintBusy = _s26[1];
 	var toast = useToast();
 
-	useEffect(function () {
+	var load = useCallback(function () {
 		api.get("audit", {}).then(function (r) { setData(r); }).catch(function (e) { toast.show(String((e && e.message) || e), "err"); }).finally(function () { setLoading(false); });
 	}, []);
+	useEffect(function () { load(); }, [load]);
+
+	// 手动触发一轮衰减 + 全局治理（sidecar maintenance）
+	var runMaintenance = function () {
+		if (maintBusy) return;
+		setMaintBusy(true);
+		api.post("maintenance", {}).then(function (r) {
+			var g = (r && r.govern) || {};
+			var d = (r && r.decay) || {};
+			toast.show("维护完成：完结 " + (d.ended || 0) + " 枝 · 枯萎 " + (d.wilted || 0) + " 叶 · 治理：" + ((g.actions || [])[0] || "无"));
+			load();
+		}).catch(function (e) { toast.show("维护失败：" + ((e && e.message) || e), "err"); }).finally(function () { setMaintBusy(false); });
+	};
 
 	if (loading) return h(Spinner, null);
 	if (!data) return null;
@@ -780,10 +713,12 @@ function AuditTab() {
 			h(Stat, { accent: "var(--dmb-accent2)", label: "提取 Run", value: s.extract_runs || 0, delay: 240 }),
 			h(Stat, { accent: "var(--dmb-text3)", label: "提取跳过", value: s.extract_skips || 0, delay: 300 })
 		),
+		h("div", { className: "dmb-actions" },
+			h("button", { className: "dmb-btn" + (maintBusy ? "" : " primary"), onClick: runMaintenance, disabled: maintBusy, title: "立即执行一轮衰减判定 + 健康治理（30天闲置枝完结、低使用率卡降权）" }, "立即维护")),
 		h("div", { className: "dmb-card" },
 			h("h3", null, h(Icon, { name: "trend", size: 14 }), "最近活动轨迹（按事件）"),
 			h(Sparks, { data: sparkData }),
-			h("div", { style: { color: "var(--dmb-text3)", fontSize: 11, marginTop: 6 } }, "绿=注入被用 · 黄=注入未用 · 蓝=注入命中 · 紫=提取 · 灰=跳过")
+			h("div", { style: { color: "var(--dmb-text3)", fontSize: 11, marginTop: 6 } }, "绿=注入被用 · 黄=注入未用 · 蓝=注入命中 · 紫=提取/衰减 · 橙=治理 · 灰=跳过")
 		),
 		h("div", { className: "dmb-section-title" }, "决策日志（最近 " + (data.log || []).length + " 条）"),
 		(data.log || []).length === 0 ? h(Empty, null, "暂无日志") :
@@ -814,6 +749,10 @@ var EDGE_STYLE = {
 	entity: { color: "rgba(148,163,184,0.5)", dash: "4 4" },
 	supersedes: { color: "rgba(248,113,113,0.6)", dash: "2 3" },
 	parent: { color: "rgba(100,116,139,0.6)", dash: "6 3" }
+};
+// 激活高亮色（按边类型提亮，用于选中节点的相邻边）
+var HIGHLIGHT_EDGE = {
+	belongs: "#93c5fd", entity: "#a5f3fc", supersedes: "#fca5a5", parent: "#cbd5e1"
 };
 var _svgNS = "http://www.w3.org/2000/svg";
 
@@ -1022,6 +961,9 @@ function GraphCanvas(props) {
 		svg.addEventListener("pointermove", onPointerMove);
 		svg.addEventListener("pointerdown", onPointerDown);
 		svg.addEventListener("pointerup", onPointerUp);
+		// M5：指针被 OS 抢断（触摸滚动/Alt-Tab/右键）时复位拖拽，防 rAF 永续空转
+		svg.addEventListener("pointercancel", onPointerUp);
+		svg.addEventListener("lostpointercapture", onPointerUp);
 		svg.addEventListener("wheel", onWheel, { passive: false });
 		svg.addEventListener("dblclick", onDblClick);
 
@@ -1031,6 +973,8 @@ function GraphCanvas(props) {
 			svg.removeEventListener("pointermove", onPointerMove);
 			svg.removeEventListener("pointerdown", onPointerDown);
 			svg.removeEventListener("pointerup", onPointerUp);
+			svg.removeEventListener("pointercancel", onPointerUp);
+			svg.removeEventListener("lostpointercapture", onPointerUp);
 			svg.removeEventListener("wheel", onWheel);
 			svg.removeEventListener("dblclick", onDblClick);
 		};
@@ -1062,9 +1006,14 @@ function GraphCanvas(props) {
 			var e = item.e;
 			var lit = !sel || e.source === sel || e.target === sel;
 			item.line.setAttribute("opacity", lit ? 1 : 0.08);
-			// 选中节点的相邻边：虚线沿箭头方向动态流动
-			if (lit && sel) item.line.classList.add("lit");
-			else item.line.classList.remove("lit");
+			// 激活节点的相邻边：提亮 + 加粗 + 发光 + 流动（与未激活拉开明显差距）
+			if (lit && sel) {
+				item.line.classList.add("lit");
+				item.line.setAttribute("stroke", HIGHLIGHT_EDGE[e.kind] || "#93c5fd");
+			} else {
+				item.line.classList.remove("lit");
+				item.line.setAttribute("stroke", (EDGE_STYLE[e.kind] || EDGE_STYLE.belongs).color);
+			}
 		});
 	}, [props.selected]);
 
@@ -1265,151 +1214,383 @@ function tick(sim, W, H) {
 	}
 }
 
-function GraphTab(props) {
-	var _g0 = useState(null), data = _g0[0], setData = _g0[1];
-	var _g1 = useState(true), loading = _g1[0], setLoading = _g1[1];
-	var _g2 = useState(null), selected = _g2[0], setSelected = _g2[1];
-	var _g3 = useState(true), showWiki = _g3[0], setShowWiki = _g3[1];
-	var _g4 = useState(true), showEntity = _g4[0], setShowEntity = _g4[1];
-	var _g5 = useState(0), layoutKey = _g5[0], setLayoutKey = _g5[1];
-	var _g6 = useState(null), detail = _g6[0], setDetail = _g6[1];
+function EventGraphTab(props) {
+	var _e0 = useState(null), data = _e0[0], setData = _e0[1];
+	var _e1 = useState(true), loading = _e1[0], setLoading = _e1[1];
+	var _e2 = useState({}), expanded = _e2[0], setExpanded = _e2[1];
+	var _e3 = useState(null), selected = _e3[0], setSelected = _e3[1];
+	var _e4 = useState(""), navQuery = _e4[0], setNavQuery = _e4[1];
+	var _e5 = useState(0), layoutKey = _e5[0], setLayoutKey = _e5[1];
+	var _e6 = useState(true), showEntity = _e6[0], setShowEntity = _e6[1];
+	var _e7 = useState(true), showIsolated = _e7[0], setShowIsolated = _e7[1];
+	var _e8 = useState(true), navOpen = _e8[0], setNavOpen = _e8[1];
 
 	var load = useCallback(function () {
 		setLoading(true);
-		api.get("graph").then(function (d) {
-			setData(d); setSelected(null); setDetail(null);
-		}).catch(function (err) {
+		api.get("graph").then(function (d) { setData(d); }).catch(function (err) {
 			setData({ error: String((err && err.message) || err) });
 		}).finally(function () { setLoading(false); });
 	}, []);
 	useEffect(function () { load(); }, [load, props.refreshKey]);
 
-	var nodes = useMemo(function () {
-		if (!data || !data.nodes) return [];
-		return data.nodes.filter(function (n) {
-			return !(n.kind.indexOf("wiki:") === 0 && !showWiki);
+	// 树构建：链=父，事件卡按 belongs 边归入（wiki 归知识图谱，不在此）
+	var tree = useMemo(function () {
+		if (!data || !data.nodes) return null;
+		var parentOf = {};
+		(data.edges || []).forEach(function (e) { if (e.kind === "belongs") parentOf[e.target] = e.source; });
+		var chains = [], loose = [], others = [];
+		(data.nodes || []).forEach(function (n) {
+			if (n.kind === "chain") chains.push(n);
+			else if (n.kind === "event" && !parentOf[n.id]) loose.push(n);
+			else if (n.kind.indexOf("wiki:") !== 0) others.push(n);
 		});
-	}, [data, showWiki]);
+		var byTime = function (a, b) { return (a.created_at || "").localeCompare(b.created_at || ""); };
+		chains.forEach(function (ch) {
+			ch.kids = (data.nodes || []).filter(function (n) { return parentOf[n.id] === ch.id; }).sort(byTime);
+		});
+		chains.sort(function (a, b) { return (b.kids ? b.kids.length : 0) - (a.kids ? a.kids.length : 0); });
+		loose.sort(byTime);
+		others.sort(byTime);
+		return { chains: chains, loose: loose, others: others, parentOf: parentOf };
+	}, [data]);
 
-	var edges = useMemo(function () {
+	// 图谱过滤（事件记忆：排除 wiki）
+	var gNodes = useMemo(function () {
+		if (!data || !data.nodes) return [];
+		var connected = {};
+		(data.edges || []).forEach(function (e) { connected[e.source] = 1; connected[e.target] = 1; });
+		return (data.nodes || []).filter(function (n) {
+			if (n.kind.indexOf("wiki:") === 0) return false;
+			if (!showIsolated && !connected[n.id]) return false;
+			return true;
+		});
+	}, [data, showIsolated]);
+	var gEdges = useMemo(function () {
 		if (!data || !data.edges) return [];
 		var keep = {};
-		nodes.forEach(function (n) { keep[n.id] = 1; });
-		return data.edges.filter(function (e) {
+		gNodes.forEach(function (n) { keep[n.id] = 1; });
+		return (data.edges || []).filter(function (e) {
 			if (e.kind === "entity" && !showEntity) return false;
 			return keep[e.source] && keep[e.target];
 		});
-	}, [data, showEntity, nodes]);
+	}, [data, showEntity, gNodes]);
 
-	// 选中节点被过滤掉 → 清空
-	useEffect(function () {
-		if (!selected) return;
-		for (var i = 0; i < nodes.length; i++) {
-			if (nodes[i].id === selected) return;
+	// 联动①：点图 → 树自动展开到所属链
+	var onGraphSelect = function (id) {
+		setSelected(id);
+		if (tree && tree.parentOf[id]) {
+			setExpanded(function (prev) {
+				var next = {};
+				Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
+				next[tree.parentOf[id]] = true;
+				return next;
+			});
 		}
-		setSelected(null);
-	}, [nodes, selected]);
+	};
 
-	// 选中 → 拉详情
-	useEffect(function () {
-		if (!selected || !data) { setDetail(null); return; }
-		var node = null;
-		for (var i = 0; i < data.nodes.length; i++) {
-			if (data.nodes[i].id === selected) { node = data.nodes[i]; break; }
-		}
-		if (!node) { setDetail(null); return; }
-		if (node.kind.indexOf("wiki:") === 0) {
-			setDetail({ node: node, card: null });
-			return;
-		}
-		setDetail(null);
-		var stale = false;
-		api.get("card", { id: selected }).then(function (d) {
-			if (!stale) setDetail({ node: node, card: d.card });
-		}).catch(function () {
-			if (!stale) setDetail({ node: node, card: null });
+	// 联动②：点树 → 图谱聚焦（选中即高亮邻居）
+	var toggle = function (id) {
+		setExpanded(function (prev) {
+			var next = {};
+			Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
+			next[id] = !prev[id];
+			return next;
 		});
-		return function () { stale = true; };
-	}, [selected, data]);
+		setSelected(id);
+	};
 
-	var neigh = useMemo(function () {
-		if (!selected || !data) return [];
-		var out = [];
-		(data.edges || []).forEach(function (e) {
-			var other = null;
-			if (e.source === selected) other = e.target;
-			else if (e.target === selected) other = e.source;
-			if (!other) return;
-			for (var i = 0; i < data.nodes.length; i++) {
-				if (data.nodes[i].id === other) {
-					out.push({ id: other, title: data.nodes[i].title, kind: data.nodes[i].kind, edge: e.kind });
-					break;
-				}
-			}
-		});
-		return out;
-	}, [selected, data]);
+	var q = navQuery.trim().toLowerCase();
+	var renderLeaf = function (n) {
+		var active = selected === n.id;
+		return h("div", { key: n.id, className: "dmb-tree-item dmb-tree-leaf" + (active ? " active" : ""), onClick: function () { setSelected(n.id); } },
+			h("div", { className: "dmb-tree-row" },
+				h("span", { className: "dmb-tree-dot", style: { background: GRAPH_KIND_COLOR[n.kind] || "var(--dmb-text3)" } }),
+				h("span", { className: "dmb-tree-title", title: n.title }, n.title),
+				h("span", { className: "dmb-tree-time" }, (n.created_at || "").slice(5, 10))
+			)
+		);
+	};
+	var renderChain = function (ch) {
+		var isOpen = (q || focusNode) ? true : !!expanded[ch.id];
+		var kids = ch.kids || [];
+		return h("div", { key: ch.id, className: "dmb-tree-item dmb-tree-chain" },
+			h("div", { className: "dmb-tree-row" + (selected === ch.id ? " active" : ""), onClick: function () { toggle(ch.id); } },
+				h("span", { className: "dmb-tree-arrow" + (isOpen ? " open" : "") }, "▸"),
+				h("span", { className: "dmb-tree-dot", style: { background: GRAPH_KIND_COLOR.chain } }),
+				h("span", { className: "dmb-tree-title", title: ch.title }, ch.title),
+				h("span", { className: "dmb-tree-badge" }, kids.length)
+			),
+			isOpen && kids.length ? h("div", { className: "dmb-tree-kids" }, kids.map(renderLeaf)) : null
+		);
+	};
 
 	if (loading && !data) return h("div", { className: "dmb-empty" }, h("div", { className: "dmb-spinner" }));
-	if (data && data.error) return h("div", { className: "dmb-empty" }, "图谱加载失败：" + data.error);
-	if (!data) return null;
+	if (data && data.error) return h("div", { className: "dmb-empty" }, "事件图谱加载失败：" + data.error);
+	if (!data || !tree) return null;
 
 	var counts = data.counts || {};
-	var legend = Object.keys(GRAPH_KIND_COLOR).map(function (k) {
-		return h("span", { key: k }, h("i", { style: { background: GRAPH_KIND_COLOR[k] } }), GRAPH_KIND_LABEL[k] || k);
-	});
-
-	var side = null;
-	if (detail) {
-		var node = detail.node;
-		var rows = [];
-		var pushRow = function (k, v) { if (v !== undefined && v !== null && v !== "") rows.push(h("div", { key: k }, h("span", { className: "k" }, k), h("span", { className: "v" }, String(v)))); };
-		pushRow("创建", (node.created_at || "").slice(0, 19));
-		pushRow("更新", (node.updated_at || "").slice(0, 19));
-		pushRow("置信", node.confidence);
-		pushRow("证据", node.evidence);
-		pushRow("状态", node.status);
-		pushRow("路径", node.source_path);
-		if (detail.card) {
-			pushRow("来源", detail.card.sourcePart);
-			pushRow("链", detail.card.chainTitle || "");
-			if (detail.card.content) rows.push(h("div", { key: "content", style: { gridColumn: "1 / -1" } }, h("span", { className: "k" }, "内容"), h("span", { className: "v" }, detail.card.content)));
+	// 按图搜索联动：点图选中节点 → 树只显示相关事件（所属链 + 子卡，或未归类/经验画像单节点）
+	var focusNode = null;
+	if (selected && data.nodes) {
+		for (var _fi = 0; _fi < data.nodes.length; _fi++) {
+			if (data.nodes[_fi].id === selected) { focusNode = data.nodes[_fi]; break; }
 		}
-		side = h("div", { className: "dmb-graph-side" },
-			h("h4", null,
-				h("span", { className: "dmb-kind " + node.kind.replace(":", "-") }, GRAPH_KIND_LABEL[node.kind] || node.kind),
-				node.title),
-			h("div", { className: "meta" }, rows),
-			neigh.length > 0 ? h("div", { className: "neigh" }, neigh.map(function (nb) {
-				return h("span", { key: nb.id, onClick: function () { setSelected(nb.id); } },
-					nb.title, h("b", null, "·" + (nb.edge === "belongs" ? "归链" : nb.edge === "entity" ? "实体" : nb.edge === "supersedes" ? "版本" : "上位")));
-			})) : null,
-			h("div", { className: "dmb-actions" },
-				h("button", { className: "dmb-btn", onClick: function () { setSelected(null); } }, "取消选中"),
-				h("button", { className: "dmb-btn", onClick: function () { setDetail(null); setSelected(null); } }, "关闭"))
-		);
+	}
+	var navChains, navLoose, navOthers;
+	if (q) {
+		navChains = tree.chains.map(function (ch) {
+			var kids = (ch.kids || []).filter(function (n) { return (n.title || "").toLowerCase().indexOf(q) >= 0; });
+			return (((ch.title || "").toLowerCase().indexOf(q) >= 0) || kids.length) ? { ...ch, kids: kids } : null;
+		}).filter(Boolean);
+		navLoose = tree.loose.filter(function (n) { return (n.title || "").toLowerCase().indexOf(q) >= 0; });
+		navOthers = tree.others.filter(function (n) { return (n.title || "").toLowerCase().indexOf(q) >= 0; });
+	} else if (focusNode) {
+		if (focusNode.kind === "chain") {
+			navChains = tree.chains.filter(function (c) { return c.id === focusNode.id; });
+			navLoose = [];
+			navOthers = [];
+		} else if (focusNode.kind === "event") {
+			var _pc = tree.parentOf[focusNode.id];
+			if (_pc) {
+				navChains = tree.chains.filter(function (c) { return c.id === _pc; });
+				navLoose = [];
+				navOthers = [];
+			} else {
+				navChains = [];
+				navLoose = [focusNode];
+				navOthers = [];
+			}
+		} else {
+			navChains = [];
+			navLoose = [];
+			navOthers = [focusNode];
+		}
+	} else {
+		navChains = tree.chains;
+		navLoose = tree.loose;
+		navOthers = tree.others;
 	}
 
 	return h("div", { className: "dmb-fade" },
 		h("div", { className: "dmb-graph-toolbar" },
-			h("span", { className: "dmb-hint" }, "共 " + counts.cards + " 卡 · " + counts.chains + " 链 · " + counts.wiki + " 知识 · " + counts.edges + " 关联"),
+			h("span", { className: "dmb-hint" }, "共 " + counts.cards + " 卡 · " + counts.chains + " 链 · " + counts.edges + " 关联"),
 			h("div", { className: "grow" }),
-			h("label", { className: "dmb-check" }, h("input", { type: "checkbox", checked: showWiki, onChange: function (e) { setShowWiki(e.target.checked); } }), "知识库"),
 			h("label", { className: "dmb-check" }, h("input", { type: "checkbox", checked: showEntity, onChange: function (e) { setShowEntity(e.target.checked); } }), "实体关联"),
-			h("button", { className: "dmb-btn", onClick: function () { setLayoutKey(function (k) { return k + 1; }); }, title: "重新随机布局" }, "重新布局")
+			h("label", { className: "dmb-check" }, h("input", { type: "checkbox", checked: showIsolated, onChange: function (e) { setShowIsolated(e.target.checked); } }), "孤立节点"),
+			h("button", { className: "dmb-btn", onClick: function () { setLayoutKey(function (k) { return k + 1; }); } }, "重新布局")
 		),
-		h(GraphCanvas, { nodes: nodes, edges: edges, selected: selected, onSelect: setSelected, layoutKey: layoutKey }),
-		h("div", { className: "dmb-graph-legend" }, legend),
-		side,
-		h("div", { className: "dmb-hint", style: { marginTop: 8 } }, "拖拽节点移动 · 滚轮缩放 · 空白拖拽平移 · 点击节点高亮关联 · 双击复位")
+		h("div", { className: "dmb-eg-main" },
+			h(GraphCanvas, { nodes: gNodes, edges: gEdges, selected: selected, onSelect: onGraphSelect, layoutKey: layoutKey })
+		),
+		h("div", { className: "dmb-eg-nav" + (navOpen ? "" : " collapsed") },
+			h("div", { className: "dmb-eg-nav-head" },
+				h("span", { className: "dmb-hint" }, focusNode ? "相关事件：聚焦 " + focusNode.title : "记忆树 · 点击聚焦图谱"),
+				h("div", { className: "grow" }),
+				focusNode ? h("button", { className: "dmb-btn", onClick: function () { setSelected(null); }, title: "显示全部" }, "✕ 清除") : null,
+				h("button", { className: "dmb-btn", onClick: function () { setNavOpen(!navOpen); }, title: navOpen ? "收起导航" : "展开导航" }, navOpen ? "▼ 收起" : "▲ 展开")
+			),
+			navOpen ? h("div", { className: "dmb-eg-nav-body" },
+				h("input", { className: "dmb-nav-search", value: navQuery, placeholder: "过滤树…", onChange: function (e) { setNavQuery(e.target.value); } }),
+				h("div", { className: "dmb-tree-wrap dmb-eg-tree" },
+					navChains.map(renderChain),
+					navLoose.length ? h("div", { key: "g-loose" }, h("div", { className: "dmb-tree-group" }, "未归类"), navLoose.map(renderLeaf)) : null,
+					navOthers.length ? h("div", { key: "g-other" }, h("div", { className: "dmb-tree-group" }, "经验画像"), navOthers.map(renderLeaf)) : null
+				)
+			) : null
+		)
 	);
 }
 
+/* timeline tab: 时间倒序事件流 */
+function TimelineTab(props) {
+	var _l0 = useState(null), data = _l0[0], setData = _l0[1];
+	var _l1 = useState(true), loading = _l1[0], setLoading = _l1[1];
+	var _l2 = useState(null), selected = _l2[0], setSelected = _l2[1];
+	var _l3 = useState(null), detail = _l3[0], setDetail = _l3[1];
+
+	var load = useCallback(function () {
+		setLoading(true);
+		api.get("browse", { limit: 200 }).then(function (d) { setData(d); }).catch(function (err) {
+			setData({ error: String((err && err.message) || err) });
+		}).finally(function () { setLoading(false); });
+	}, []);
+	useEffect(function () { load(); }, [load, props.refreshKey]);
+
+	useEffect(function () {
+		if (!selected) { setDetail(null); return; }
+		setDetail(null);
+		var stale = false;
+		api.get("card", { id: selected }).then(function (d) {
+			if (!stale) setDetail(d.card || null);
+		}).catch(function () { if (!stale) setDetail(null); });
+		return function () { stale = true; };
+	}, [selected]);
+
+	// 按日期分组、时间倒序（事件流）
+	var groups = useMemo(function () {
+		if (!data || !data.cards) return [];
+		var list = (data.cards || []).filter(function (c) {
+			return c.kind === "event" || c.kind === "lesson_pending" || c.kind === "lesson_permanent";
+		});
+		list.sort(function (a, b) { return (b.createdAt || "").localeCompare(a.createdAt || ""); });
+		var map = {}, order = [];
+		list.forEach(function (c) {
+			var day = (c.createdAt || "").slice(0, 10);
+			if (!map[day]) { map[day] = []; order.push(day); }
+			map[day].push(c);
+		});
+		return order.map(function (day) { return { day: day, items: map[day] }; });
+	}, [data]);
+
+	if (loading && !data) return h("div", { className: "dmb-empty" }, h("div", { className: "dmb-spinner" }));
+	if (data && data.error) return h("div", { className: "dmb-empty" }, "时间线加载失败：" + data.error);
+	if (!data) return null;
+
+	var today = new Date().toISOString().slice(0, 10);
+	var dayLabel = function (day) {
+		if (day === today) return "今天";
+		var y = new Date(day + "T00:00:00");
+		var t = new Date(today + "T00:00:00");
+		var diff = Math.round((t - y) / 86400000);
+		if (diff === 1) return "昨天";
+		if (diff > 1 && diff < 7) return diff + " 天前";
+		return day;
+	};
+
+	var side = null;
+	if (detail) {
+		var rows = [];
+		var pushRow = function (k, v) { if (v !== undefined && v !== null && v !== "") rows.push(h("div", { key: k }, h("span", { className: "k" }, k), h("span", { className: "v" }, String(v)))); };
+		pushRow("创建", (detail.createdAt || "").slice(0, 19));
+		pushRow("链", detail.chainTitle || "");
+		pushRow("来源", detail.sourcePart || "");
+		pushRow("证据", detail.evidence || "");
+		pushRow("路径", detail.sourcePath || "");
+		if (detail.content) rows.push(h("div", { key: "content", style: { gridColumn: "1 / -1" } }, h("span", { className: "k" }, "内容"), h("span", { className: "v" }, detail.content)));
+		side = h("div", { className: "dmb-graph-side" },
+			h("h4", null, h("span", { className: "dmb-kind " + (detail.kind || "") }, KIND_LABEL[detail.kind] || detail.kind || ""), detail.title || ""),
+			h("div", { className: "meta" }, rows),
+			h("div", { className: "dmb-actions" }, h("button", { className: "dmb-btn", onClick: function () { setDetail(null); setSelected(null); } }, "关闭"))
+		);
+	}
+
+	return h("div", { className: "dmb-fade" },
+		groups.length === 0 ? h(Empty, null, "暂无事件") : groups.map(function (g) {
+			return h("div", { key: g.day },
+				h("div", { className: "dmb-tl-day" }, dayLabel(g.day)),
+				g.items.map(function (c) {
+					return h("div", { key: c.id, className: "dmb-tl-item" + (selected === c.id ? " active" : ""), onClick: function () { setSelected(c.id); } },
+						h("span", { className: "dmb-tree-dot", style: { background: KIND_COLOR[c.kind] || "var(--dmb-text3)" } }),
+						h("div", { style: { flex: 1, minWidth: 0 } },
+							h("div", { className: "t" }, c.title || c.id),
+							c.content ? h("div", { className: "c" }, c.content) : null,
+							h("div", { className: "m" },
+								h("span", null, KIND_LABEL[c.kind] || c.kind),
+								c.chainTitle ? h("span", null, "链 · " + c.chainTitle) : null,
+								h("span", null, (c.createdAt || "").slice(11, 16))
+							)
+						)
+					);
+				})
+			);
+		}),
+		side
+	);
+}
+
+/* knowledge graph tab: wiki 力导向图 + 搜索 + 条目列表 */
+function WikiGraphTab(props) {
+	var _w0 = useState(null), data = _w0[0], setData = _w0[1];
+	var _w1 = useState(true), loading = _w1[0], setLoading = _w1[1];
+	var _w2 = useState(""), query = _w2[0], setQuery = _w2[1];
+	var _w3 = useState(null), selected = _w3[0], setSelected = _w3[1];
+	var _w4 = useState(0), layoutKey = _w4[0], setLayoutKey = _w4[1];
+
+	var load = useCallback(function () {
+		setLoading(true);
+		api.get("graph").then(function (d) { setData(d); }).catch(function (err) {
+			setData({ error: String((err && err.message) || err) });
+		}).finally(function () { setLoading(false); });
+	}, []);
+	useEffect(function () { load(); }, [load, props.refreshKey]);
+
+	var wNodes = useMemo(function () {
+		if (!data || !data.nodes) return [];
+		var q = query.trim().toLowerCase();
+		return (data.nodes || []).filter(function (n) {
+			if (n.kind.indexOf("wiki:") !== 0) return false;
+			if (q && (n.title || "").toLowerCase().indexOf(q) < 0) return false;
+			return true;
+		});
+	}, [data, query]);
+	var wEdges = useMemo(function () {
+		if (!data || !data.edges) return [];
+		var keep = {};
+		wNodes.forEach(function (n) { keep[n.id] = 1; });
+		return (data.edges || []).filter(function (e) {
+			if (e.kind === "belongs" || e.kind === "entity") return false;  // 事件关系不适用
+			return keep[e.source] && keep[e.target];
+		});
+	}, [data, wNodes]);
+
+	var wikiList = useMemo(function () {
+		if (!data || !data.nodes) return [];
+		var q = query.trim().toLowerCase();
+		return (data.nodes || []).filter(function (n) {
+			if (n.kind.indexOf("wiki:") !== 0) return false;
+			if (q && (n.title || "").toLowerCase().indexOf(q) < 0) return false;
+			return true;
+		}).sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); });
+	}, [data, query]);
+
+	if (loading && !data) return h("div", { className: "dmb-empty" }, h("div", { className: "dmb-spinner" }));
+	if (data && data.error) return h("div", { className: "dmb-empty" }, "知识图谱加载失败：" + data.error);
+	if (!data) return null;
+
+	var side = null;
+	if (selected) {
+		var node = null;
+		for (var i = 0; i < (data.nodes || []).length; i++) {
+			if (data.nodes[i].id === selected) { node = data.nodes[i]; break; }
+		}
+		if (node) {
+			var rows = [];
+			var pushRow = function (k, v) { if (v !== undefined && v !== null && v !== "") rows.push(h("div", { key: k }, h("span", { className: "k" }, k), h("span", { className: "v" }, String(v)))); };
+			pushRow("类型", GRAPH_KIND_LABEL[node.kind] || node.kind);
+			pushRow("状态", node.status);
+			pushRow("创建", (node.created_at || "").slice(0, 10));
+			pushRow("路径", node.source_path);
+			side = h("div", { className: "dmb-graph-side" },
+				h("h4", null, h("span", { className: "dmb-kind " + node.kind.replace(":", "-") }, GRAPH_KIND_LABEL[node.kind] || node.kind), node.title),
+				h("div", { className: "meta" }, rows),
+				h("div", { className: "dmb-actions" }, h("button", { className: "dmb-btn", onClick: function () { setSelected(null); } }, "关闭"))
+			);
+		}
+	}
+
+	return h("div", { className: "dmb-fade" },
+		h("div", { className: "dmb-graph-toolbar" },
+			h("span", { className: "dmb-hint" }, "知识条目 " + wikiList.length + " 条"),
+			h("div", { className: "grow" }),
+			h("button", { className: "dmb-btn", onClick: function () { setLayoutKey(function (k) { return k + 1; }); } }, "重新布局")
+		),
+		h("div", { className: "dmb-search" },
+			h("span", { className: "mag" }, "🔍"),
+			h("input", { value: query, placeholder: "搜索知识…", onChange: function (e) { setQuery(e.target.value); } })
+		),
+		h(GraphCanvas, { nodes: wNodes, edges: wEdges, selected: selected, onSelect: setSelected, layoutKey: layoutKey }),
+		wikiList.length ? h("div", { className: "dmb-wg-list" }, wikiList.map(function (n) {
+			return h("div", { key: n.id, className: "dmb-wg-item" + (selected === n.id ? " active" : ""), onClick: function () { setSelected(n.id); } },
+				h("span", { className: "dmb-tree-dot", style: { background: GRAPH_KIND_COLOR[n.kind] } }), " ", n.title);
+		})) : h(Empty, null, "暂无知识条目（知识问答会沉淀到此处）"),
+		side
+	);
+}
 function Sparks(props) {
 	var data = props.data || [];
 	if (data.length < 2) return h("div", { className: "dmb-empty" }, "活动数据不足");
 	var W = 560, H = 90, pad = 4, n = data.length;
-	var colors = { inject_hit: "var(--dmb-accent)", inject_used: "var(--dmb-ok)", inject_unused: "var(--dmb-warn)", extract_runs: "var(--dmb-accent2)", extract_skip: "var(--dmb-text3)", lemonade_start: "var(--dmb-warn)", lemonade_load: "var(--dmb-warn)", local_backend_ready: "var(--dmb-ok)" };
+	var colors = { inject_hit: "var(--dmb-accent)", inject_used: "var(--dmb-ok)", inject_unused: "var(--dmb-warn)", extract_runs: "var(--dmb-accent2)", extract_skip: "var(--dmb-text3)", lemonade_start: "var(--dmb-warn)", lemonade_load: "var(--dmb-warn)", local_backend_ready: "var(--dmb-ok)", decay: "var(--dmb-accent2)", govern_action: "var(--dmb-warn)", extract_done: "var(--dmb-accent2)", extract_cost: "var(--dmb-text3)" };
 	var pts = data.map(function (topic, i) { return { x: pad + (i / Math.max(1, n - 1)) * (W - pad * 2), y: H / 2, color: colors[topic] || "var(--dmb-text3)" }; });
 	var line = pts.map(function (p, i) { return (i === 0 ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1); }).join(" ");
 	return h("svg", { className: "dmb-spark", viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none" },
