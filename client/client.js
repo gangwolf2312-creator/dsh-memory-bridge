@@ -183,7 +183,6 @@ var CSS2 = [
 	".dmb-tree-kids { margin-left: 14px; border-left: 1px solid var(--dmb-border); padding-left: 4px; }",
 	/* event graph: 图在上、树导航在下（上下布局） */
 	".dmb-eg-nav { width: 100%; display: flex; flex-direction: column; margin-top: 10px; }",
-	".dmb-eg-nav.collapsed { display: none; }",
 	".dmb-eg-nav-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 6px; }",
 	".dmb-eg-nav-body { display: flex; flex-direction: column; gap: 6px; }",
 	".dmb-nav-search { height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--dmb-border2); background: var(--dmb-card2); color: var(--dmb-text); font-size: 12px; outline: none; }",
@@ -1290,12 +1289,14 @@ function EventGraphTab(props) {
 		}
 	};
 
-	// 联动②：点树 → 图谱聚焦（选中即高亮邻居）
+	// 联动②：点树 → 图谱聚焦（选中即高亮邻居）；链行点击 = 切换收折
 	var toggle = function (id) {
 		setExpanded(function (prev) {
 			var next = {};
 			Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
-			next[id] = !prev[id];
+			// 当前态：显式 false=收，显式 true=展，undefined=跟随聚焦默认（展开）
+			var cur = prev[id] === false ? false : true;
+			next[id] = !cur;
 			return next;
 		});
 		setSelected(id);
@@ -1313,7 +1314,8 @@ function EventGraphTab(props) {
 		);
 	};
 	var renderChain = function (ch) {
-		var isOpen = (q || focusNode) ? true : !!expanded[ch.id];
+		// 聚焦/搜索时默认展开，但允许手动收折（expanded 显式 false 优先）
+		var isOpen = expanded[ch.id] === false ? false : ((q || focusNode) ? true : !!expanded[ch.id]);
 		var kids = ch.kids || [];
 		return h("div", { key: ch.id, className: "dmb-tree-item dmb-tree-chain" },
 			h("div", { className: "dmb-tree-row" + (selected === ch.id ? " active" : ""), onClick: function () { toggle(ch.id); } },
@@ -1384,7 +1386,7 @@ function EventGraphTab(props) {
 		h("div", { className: "dmb-eg-main" },
 			h(GraphCanvas, { nodes: gNodes, edges: gEdges, selected: selected, onSelect: onGraphSelect, layoutKey: layoutKey })
 		),
-		h("div", { className: "dmb-eg-nav" + (navOpen ? "" : " collapsed") },
+		h("div", { className: "dmb-eg-nav" },
 			h("div", { className: "dmb-eg-nav-head" },
 				h("span", { className: "dmb-hint" }, focusNode ? "相关事件：聚焦 " + focusNode.title : "记忆树 · 点击聚焦图谱"),
 				h("div", { className: "grow" }),
